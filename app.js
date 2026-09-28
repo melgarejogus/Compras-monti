@@ -1,86 +1,33 @@
 const $=id=>document.getElementById(id);
-const STOCK_KEY='monti.web.stock.v1';
-
+const STOCK_KEY='monti.web.stock.v2';
+let parsedData=null;
 const stockItems=[
-  ['Ñoquis','kg'],['Tallarines','kg'],['Fusiles','kg'],['Macarrones','kg'],
-  ['Ravioles pollo','porciones'],['Ravioles ricota','porciones'],['Ravioles batata','porciones'],
-  ['Focaccia','unidades'],['Volcán','unidades'],['Milanesa pollo','unidades'],['Milanesa carne','unidades'],
-  ['BOLSON DE PLATOS X300U','bolsones'],['BOLSAS PASTA X500','packs'],['PLATOS MACANDCHESS X200','packs'],
-  ['CAJAS MILANESA X100','packs'],['CAJA VOLCAN X100','packs'],['POTES SALSA X100','packs'],['BOLSAS GRANDES X1200','packs']
+ ['Ñoquis','kg'],['Fusiles','kg'],['Macarrones','kg'],['Spaghetti','kg'],['Ravioles pollo y verdura','cajas'],['Ravioles de ricota','cajas'],['Raviolones de batata','cajas'],['Pan de volcán','unidades'],
+ ['BOLSA TUCO X 4 kl','bolsas'],['BOLSA Bolo x4 kg','bolsas'],['Bolsa Pesto x 1kg','bolsas'],['Bolsa blanca x 2 kilos','bolsas'],['Bolsa de cheddar x 4kg','bolsas'],['Bolsa Mix de Queso x 2kl','bolsas'],
+ ['FOCACCIA X UNID','unidades'],['LASAGNA BOLOGNESA','unidades'],['LASAGANA VERDE','unidades'],['Milanesa vacuna x 3kg','paquetes'],['Empanadas x 6','packs'],['Meat Ball x 5 porciones','packs'],['GRAND BRASATO X 2','cajas'],['Milanesa pollo x 5kg','cajas'],
+ ['BOLSON DE PLATOS X300U','packs'],['BOLSAS PASTA X500','packs'],['PLATOS MACANDCHESS X200','packs'],['MANTELES MONTI X1000','packs'],['PARAFINADO MONTI X2000','packs'],['Cinta MONTI x unid','unidades'],['CAJAS MILANESA X100','packs'],['CAJAS DE SANDWICH X 100','packs'],['Cinta FOCACCI x 10 unids','packs'],['CAJA VOLCAN X100','packs'],['POTES SALSA X100','packs'],['BANDEJAS POSTRES X100U','packs'],['BOLSAS GRANDES X1200','packs'],['juego de cucharon x 12','packs']
 ];
-
-function norm(v){return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase()}
+function norm(v){return MontiEngine.norm(v)}
 function rows(sheet){return XLSX.utils.sheet_to_json(sheet,{defval:''})}
 function col(row,...names){for(const n of names){const found=Object.keys(row).find(k=>norm(k)===norm(n));if(found!==undefined)return row[found]}return ''}
-function asDate(v){
-  if(v instanceof Date&&!isNaN(v)) return v;
-  if(typeof v==='number'){const d=XLSX.SSF.parse_date_code(v);return d?new Date(d.y,d.m-1,d.d):null}
-  const s=String(v||'').trim(); if(!s)return null;
-  const m=s.match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/); if(m){let y=+m[3];if(y<100)y+=2000;return new Date(y,+m[2]-1,+m[1])}
-  const d=new Date(s);return isNaN(d)?null:d;
-}
+function asDate(v){if(v instanceof Date&&!isNaN(v))return v;if(typeof v==='number'){const d=XLSX.SSF.parse_date_code(v);return d?new Date(d.y,d.m-1,d.d,12):null}const s=String(v||'').trim();if(!s)return null;const m=s.match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/);if(m){let y=+m[3];if(y<100)y+=2000;return new Date(y,+m[2]-1,+m[1],12)}const d=new Date(s);return isNaN(d)?null:d}
 function fmtDate(d){return d?d.toLocaleDateString('es-AR'):'—'}
-function isCancelled(v){const n=norm(v);return ['si','sí','true','1','yes'].includes(n)}
-
-function renderStock(){
-  const saved=JSON.parse(localStorage.getItem(STOCK_KEY)||'{}');
-  $('stockGrid').innerHTML=stockItems.map(([name,unit],i)=>`<div class="stock-item"><label>${name}<small>Cargar en ${unit}</small></label><input data-stock="${i}" type="number" step="0.01" inputmode="decimal" value="${saved[name]??''}" placeholder="0"></div>`).join('');
-}
-
-$('saveStock').addEventListener('click',()=>{
-  const obj={};
-  document.querySelectorAll('[data-stock]').forEach((input,i)=>{const [name]=stockItems[i];obj[name]=Number(input.value||0)});
-  localStorage.setItem(STOCK_KEY,JSON.stringify(obj));
-  $('saveStock').textContent='Guardado ✓';setTimeout(()=>$('saveStock').textContent='Guardar stock',1300);
-});
-
-$('fileInput').addEventListener('change',async e=>{
-  const file=e.target.files?.[0]; if(!file)return;
-  try{
-    const data=await file.arrayBuffer();
-    const wb=XLSX.read(data,{type:'array',cellDates:true});
-    processWorkbook(wb,file.name);
-  }catch(err){console.error(err);alert('No pude leer el archivo. Verificá que sea un Excel de Fudo válido.');}
-});
-
+function isCancelled(v){return ['si','sí','true','1','yes'].includes(norm(v))}
+function getStock(){return JSON.parse(localStorage.getItem(STOCK_KEY)||'{}')}
+function renderStock(){const saved=getStock();$('stockGrid').innerHTML=stockItems.map(([name,unit],i)=>`<div class="stock-item"><label>${name}<small>Cargar en ${unit}</small></label><input data-stock="${i}" type="number" step="0.01" inputmode="decimal" value="${saved[name]??''}" placeholder="0"></div>`).join('')}
+$('saveStock').addEventListener('click',()=>{const obj={};document.querySelectorAll('[data-stock]').forEach((input,i)=>{const [name]=stockItems[i];obj[name]=Number(input.value||0)});localStorage.setItem(STOCK_KEY,JSON.stringify(obj));$('saveStock').textContent='Guardado ✓';setTimeout(()=>$('saveStock').textContent='Guardar stock',1300)});
+$('fileInput').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const data=await file.arrayBuffer();const wb=XLSX.read(data,{type:'array',cellDates:true});processWorkbook(wb,file.name)}catch(err){console.error(err);alert('No pude leer el archivo. Verificá que sea un Excel de Fudo válido.')}});
 function processWorkbook(wb,fileName){
-  const sheetInfo=[];let sales=0,mods=0;const dates=[];let chicken=0,beef=0,cancelledMods=0;
-  const salesSheetNames=['ventas','adiciones'];
-  const modifierName='adiciones de modificadores';
-
-  wb.SheetNames.forEach(name=>{
-    const r=rows(wb.Sheets[name]);const n=norm(name);
-    sheetInfo.push([name,r.length]);
-    if(salesSheetNames.includes(n)){
-      r.forEach(x=>{if(!isCancelled(col(x,'Cancelada','Cancelado'))){sales+=Number(col(x,'Cantidad')||1);const d=asDate(col(x,'Creación','Creacion','Fecha'));if(d)dates.push(d)}});
-    }
-    if(n===modifierName){
-      r.forEach(x=>{
-        mods++;
-        const cancelled=isCancelled(col(x,'Cancelada','Cancelado')); if(cancelled){cancelledMods++;return}
-        const group=norm(col(x,'Grupo modificador','Grupo'));const mod=norm(col(x,'Modificador'));
-        const qty=Number(col(x,'Cantidad')||1);
-        if(group==='tipo de milanesa'){
-          if(['milanesa de pollo','milanesa pollo','pollo'].includes(mod))chicken+=qty;
-          if(['milanesa de carne','milanesa carne','carne'].includes(mod))beef+=qty;
-        }
-        const d=asDate(col(x,'Creación','Creacion','Fecha'));if(d)dates.push(d);
-      });
-    }
-  });
-
-  dates.sort((a,b)=>a-b);
-  $('salesCount').textContent=Math.round(sales).toLocaleString('es-AR');
-  $('modsCount').textContent=mods.toLocaleString('es-AR');
-  $('dateFrom').textContent=fmtDate(dates[0]);$('dateTo').textContent=fmtDate(dates.at(-1));
-  $('chickenCount').textContent=chicken.toLocaleString('es-AR');$('beefCount').textContent=beef.toLocaleString('es-AR');
-  $('fileMeta').textContent=`${fileName} · ${wb.SheetNames.length} hojas detectadas`;
-  $('statusChip').textContent='Excel cargado';$('statusChip').style.color='#ff6f61';
-  $('breadersHint').textContent=`Histórico detectado: ${chicken} pollo / ${beef} carne`;
-  $('sheetAudit').innerHTML=sheetInfo.map(([n,c])=>`<div class="audit-row"><span>${n}</span><strong>${c.toLocaleString('es-AR')} filas</strong></div>`).join('')+`<div class="audit-row"><span>Modificadores cancelados excluidos</span><strong>${cancelledMods}</strong></div>`;
-  localStorage.setItem('monti.web.lastImportMeta',JSON.stringify({fileName,at:new Date().toISOString(),sheets:sheetInfo.length,dateFrom:dates[0]?.toISOString(),dateTo:dates.at(-1)?.toISOString()}));
+ const sheetInfo=[],sales=[],modifiers=[],dates=[];let cancelledMods=0,totalSales=0;
+ wb.SheetNames.forEach(name=>{const r=rows(wb.Sheets[name]);const sn=norm(name);sheetInfo.push([name,r.length]);
+  if(['ventas','adiciones'].includes(sn))r.forEach(x=>{const cancelled=isCancelled(col(x,'Cancelada','Cancelado'));const qty=Number(col(x,'Cantidad')||1);const date=asDate(col(x,'Creación','Creacion','Fecha'));const product=String(col(x,'Producto')||'').trim();if(date)dates.push(date);if(!cancelled)totalSales+=qty;sales.push({orderId:String(col(x,'Id. Venta','Id Venta','Id. venta')||''),product,category:String(col(x,'Categoría','Categoria')||''),qty,date,cancelled,source:name,modifier:false})});
+  if(sn==='adiciones de modificadores')r.forEach(x=>{const cancelled=isCancelled(col(x,'Cancelada','Cancelado'));if(cancelled)cancelledMods++;const date=asDate(col(x,'Creación','Creacion','Fecha'));if(date)dates.push(date);const m={orderId:String(col(x,'Id. Venta','Id Venta')||''),product:String(col(x,'Producto')||''),group:String(col(x,'Grupo modificador','Grupo')||''),modifier:String(col(x,'Modificador')||''),qty:Number(col(x,'Cantidad')||1),date,cancelled,source:name};modifiers.push(m);sales.push({...m,product:m.modifier,category:m.group,modifier:true})});
+ });
+ parsedData={sales,modifiers};dates.sort((a,b)=>a-b);const chicken=modifiers.filter(m=>!m.cancelled&&norm(m.group)==='tipo de milanesa'&&norm(m.modifier).includes('pollo')).reduce((a,m)=>a+m.qty,0);const beef=modifiers.filter(m=>!m.cancelled&&norm(m.group)==='tipo de milanesa'&&norm(m.modifier).includes('carne')).reduce((a,m)=>a+m.qty,0);
+ $('salesCount').textContent=Math.round(totalSales).toLocaleString('es-AR');$('modsCount').textContent=modifiers.length.toLocaleString('es-AR');$('dateFrom').textContent=fmtDate(dates[0]);$('dateTo').textContent=fmtDate(dates.at(-1));$('chickenCount').textContent=chicken.toLocaleString('es-AR');$('beefCount').textContent=beef.toLocaleString('es-AR');$('fileMeta').textContent=`${fileName} · ${wb.SheetNames.length} hojas detectadas`;$('statusChip').textContent='Excel cargado';$('statusChip').style.color='#ff6f61';$('sheetAudit').innerHTML=sheetInfo.map(([n,c])=>`<div class="audit-row"><span>${n}</span><strong>${c.toLocaleString('es-AR')} filas</strong></div>`).join('')+`<div class="audit-row"><span>Modificadores cancelados excluidos</span><strong>${cancelledMods}</strong></div>`;
+ localStorage.setItem('monti.web.lastImportMeta',JSON.stringify({fileName,at:new Date().toISOString(),sheets:sheetInfo.length,dateFrom:dates[0]?.toISOString(),dateTo:dates.at(-1)?.toISOString()}));generateOrders();
 }
-
-renderStock();
-const last=JSON.parse(localStorage.getItem('monti.web.lastImportMeta')||'null');
-if(last){$('fileMeta').textContent=`Última importación: ${last.fileName} · ${new Date(last.at).toLocaleString('es-AR')}`;}
+function orderCard(order){const cov=order.plan?.coverage||[];const planText=order.plan?.delivery?`Entrega ${fmtDate(order.plan.delivery)} · cubre ${cov.map(fmtDate).join(', ')}`:`Cobertura ${cov.length} días`;const body=order.lines.length?order.lines.map(l=>`<div class="audit-row"><span><b>${l.name}</b><small>${l.note||''}</small></span><strong>${Number(l.qty).toLocaleString('es-AR',{maximumFractionDigits:2})} ${l.unit||''}</strong></div>`).join(''):`<div class="empty">Sin pedido sugerido con el stock actual.</div>`;return `<article class="provider order-card"><h3>${order.provider}</h3><p>${planText}</p>${body}${order.warning?`<p class="muted">${order.warning}</p>`:''}</article>`}
+function generateOrders(){if(!parsedData){$('ordersGrid').innerHTML='<div class="empty">Importá un Excel para calcular pedidos.</div>';return}const stock=getStock();const now=new Date();const art=MontiEngine.artOrder(stock,now);const d29=MontiEngine.day29Order(stock,art,parsedData.sales,now);const cdp=MontiEngine.cdpOrder(parsedData,stock,now,false);const cdp29=MontiEngine.cdpOrder(parsedData,stock,now,true);const breaders=MontiEngine.breadersOrder(parsedData,stock,now);const packaging=MontiEngine.packagingOrder(parsedData,stock,now);$('ordersGrid').innerHTML=[art,d29,cdp,cdp29,breaders,packaging].map(orderCard).join('');const p=MontiEngine.plans(now);$('planMeta').textContent=`La Artesanal: ${fmtDate(p.art.delivery)} · CDP: ${fmtDate(p.cdp.delivery)} · Breaders: ${fmtDate(p.breaders.delivery)} · cálculo con 20% de cobertura.`}
+$('generateOrders').addEventListener('click',()=>{const obj={};document.querySelectorAll('[data-stock]').forEach((input,i)=>obj[stockItems[i][0]]=Number(input.value||0));localStorage.setItem(STOCK_KEY,JSON.stringify(obj));generateOrders()});
+renderStock();const last=JSON.parse(localStorage.getItem('monti.web.lastImportMeta')||'null');if(last)$('fileMeta').textContent=`Última importación: ${last.fileName} · ${new Date(last.at).toLocaleString('es-AR')}`;generateOrders();
