@@ -28,29 +28,46 @@
     {name:'Pan de volcán',unit:'cajas x12',stock:'Pan de volcán',round:12}
   ];
 
-  function snapshotDate(now){
+  function snapshotTimestamp(now){
     const raw=localStorage.getItem(STOCK_META_KEY);
     const d=raw?new Date(raw):new Date(now);
-    if(isNaN(d)) return new Date(now);
-    d.setHours(12,0,0,0);
-    return d;
+    return isNaN(d)?new Date(now):d;
   }
-  function datesAfterSnapshotUntilDelivery(snapshot,delivery){
-    const out=[]; let d=addDays(snapshot,1);
+  function serviceRemainingFraction(ts){
+    // Jornada operativa estimada 11:00 -> 02:00 del día siguiente.
+    // El stock cargado representa el stock REAL al momento de guardarlo, por eso
+    // sólo proyectamos la parte de la jornada que todavía falta consumir.
+    const d=new Date(ts);
+    const mins=d.getHours()*60+d.getMinutes();
+    const open=11*60, close=26*60;
+    let operationalMinute=mins;
+    if(mins<2*60) operationalMinute=24*60+mins;
+    if(operationalMinute<open) return 1;
+    if(operationalMinute>=close) return 0;
+    return Math.max(0,Math.min(1,(close-operationalMinute)/(close-open)));
+  }
+  function preDeliveryDemand(proj,snapshot,delivery){
     const end=new Date(delivery);end.setHours(12,0,0,0);
-    while(d<end){out.push(new Date(d));d=addDays(d,1)}
-    return out;
+    const snapDay=new Date(snapshot);snapDay.setHours(12,0,0,0);
+    if(snapDay>=end)return {qty:0,todayFraction:0,days:[]};
+    const todayFraction=serviceRemainingFraction(snapshot);
+    let qty=(proj[day(snapDay)]||0)*todayFraction;
+    const days=[];
+    let d=addDays(snapDay,1);
+    while(d<end){qty+=proj[day(d)]||0;days.push(new Date(d));d=addDays(d,1)}
+    return {qty,todayFraction,days};
   }
   function fmtDate(d){return new Date(d).toLocaleDateString('es-AR')}
+  function fmtTime(d){return new Date(d).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}
 
   window.MontiEngine.artOrder=function(stock,now=new Date()){
     const p=window.MontiEngine.plans(now).art;
-    const snap=snapshotDate(now);
-    const before=datesAfterSnapshotUntilDelivery(snap,p.delivery);
+    const snap=snapshotTimestamp(now);
     const lines=[];
     artItems.forEach(it=>{
       const proj=artProjection[norm(it.name)]||[];
-      const pre=before.reduce((a,d)=>a+(proj[day(d)]||0),0);
+      const preInfo=preDeliveryDemand(proj,snap,p.delivery);
+      const pre=preInfo.qty;
       const cycle=p.coverage.reduce((a,d)=>a+(proj[day(d)]||0),0);
       const st=n(stock[it.stock]);
       const need=Math.max(0,cycle*(1+safety)-(st-pre));
@@ -59,7 +76,7 @@
       if(it.name==='Pan de volcán')suggested=Math.ceil(need/12);
       else if(it.round===5)suggested=Math.ceil(need/5)*5;
       else suggested=Math.ceil(need);
-      lines.push({name:it.name,qty:suggested,unit:it.unit,forecast:cycle,stock:st,note:`stock al ${fmtDate(snap)} · consume antes ${pre.toFixed(1)} · cobertura +20%`});
+      lines.push({name:it.name,qty:suggested,unit:it.unit,forecast:cycle,stock:st,note:`stock ${fmtDate(snap)} ${fmtTime(snap)} · consumo hasta entrega ${pre.toFixed(1)} (hoy ${(preInfo.todayFraction*100).toFixed(0)}%) · cobertura +20%`});
     });
     return {provider:'La Artesanal',plan:p,lines,stockSnapshotDate:snap};
   };
@@ -74,8 +91,6 @@
     return additions.length?additions:matches;
   }
 
-  // El 29 REEMPLAZA la proyección normal de ñoquis de ese día dentro del mismo pedido.
-  // La línea principal de La Artesanal muestra el TOTAL final, no 25 kg + un refuerzo oculto.
   window.MontiEngine.day29Order=function(stock,normal,sales,now=new Date()){
     const p=window.MontiEngine.plans(now).day29;
     const target=p.delivery;
@@ -99,10 +114,8 @@
     let gnocchiLine=normal?.lines?.find(x=>norm(x.name)==='noquis');
     const previousKg=gnocchiLine?.qty||0;
     if(finalKg>0){
-      if(!gnocchiLine){
-        gnocchiLine={name:'Ñoquis',qty:finalKg,unit:'kg',forecast:specialKg+after29,stock:currentStock,note:''};
-        normal.lines.unshift(gnocchiLine);
-      }else gnocchiLine.qty=Math.max(previousKg,finalKg);
+      if(!gnocchiLine){gnocchiLine={name:'Ñoquis',qty:finalKg,unit:'kg',forecast:specialKg+after29,stock:currentStock,note:''};normal.lines.unshift(gnocchiLine)}
+      else gnocchiLine.qty=Math.max(previousKg,finalKg);
       gnocchiLine.note=`Día 29 integrado · promedio ${avgPortions.toFixed(0)} porciones (${specialKg.toFixed(1)} kg) · ${historicalDates.length} fecha(s) · días posteriores ${after29.toFixed(1)} kg · +20% · stock ${currentStock}`;
     }
 
