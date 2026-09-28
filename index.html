@@ -3,22 +3,93 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#111214" />
+  <meta name="theme-color" content="#0f1115" />
   <title>Compras Monti</title>
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
-  <header class="topbar"><div><p class="eyebrow">MONTI · COMPRAS</p><h1>Planificador de pedidos</h1></div><span id="statusChip" class="chip">Sin datos</span></header>
-  <main>
-    <section class="hero card"><div><h2>Importar Fudo</h2><p>Subí el Excel completo de Fudo. La web calcula pedidos con el motor migrado desde la app Android.</p></div><label class="primary-btn">Seleccionar Excel<input id="fileInput" type="file" accept=".xlsx,.xls" hidden /></label><div id="fileMeta" class="muted">Todavía no se importó ningún archivo.</div></section>
-    <section class="summary-grid"><article class="metric card"><span>Ventas</span><strong id="salesCount">0</strong></article><article class="metric card"><span>Modificadores</span><strong id="modsCount">0</strong></article><article class="metric card"><span>Desde</span><strong id="dateFrom">—</strong></article><article class="metric card"><span>Hasta</span><strong id="dateTo">—</strong></article></section>
-    <section class="card"><div class="section-head"><div><p class="eyebrow">AUDITORÍA</p><h2>Lectura del Excel</h2></div></div><div id="sheetAudit" class="audit-list"><div class="empty">Importá un Excel para ver la auditoría.</div></div></section>
-    <section class="card"><div class="section-head"><div><p class="eyebrow">MILANESAS</p><h2>Control de tipo</h2></div></div><div class="summary-grid two"><article class="metric inset"><span>Pollo válidas</span><strong id="chickenCount">0</strong></article><article class="metric inset"><span>Carne válidas</span><strong id="beefCount">0</strong></article></div><p class="muted">Sólo grupo “Tipo de milanesa”, sin canceladas.</p></section>
-    <section class="card" id="stock"><div class="section-head"><div><p class="eyebrow">STOCK</p><h2>Stock operativo</h2></div><button id="saveStock" class="secondary-btn">Guardar stock</button></div><p class="muted">Cargá el stock en la unidad indicada. El motor descuenta este stock al generar el pedido.</p><div id="stockGrid" class="stock-grid"></div></section>
-    <section class="card" id="orders"><div class="section-head"><div><p class="eyebrow">PEDIDOS</p><h2>Pedidos sugeridos</h2></div><button id="generateOrders" class="primary-btn button">Calcular pedidos</button></div><div id="planMeta" class="muted">Importá el Excel y cargá stock.</div><div id="ordersGrid" class="provider-grid"></div></section>
-  </main>
-  <nav class="bottom-nav"><a href="#">Inicio</a><a href="#stock">Stock</a><a href="#orders">Pedidos</a><a href="#orders">Config</a></nav>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><span class="brand-mark">M</span><div><strong>Monti Compras</strong><small>Planificación y stock</small></div></div>
+      <nav class="side-nav">
+        <button class="nav-item active" data-view="dashboard">Inicio</button>
+        <button class="nav-item" data-view="fudo">Datos Fudo</button>
+        <button class="nav-item" data-view="stock">Stock</button>
+        <button class="nav-item" data-view="orders">Pedidos</button>
+        <button class="nav-item" data-view="recipes">Recetas</button>
+        <button class="nav-item" data-view="config">Configuración</button>
+        <button class="nav-item" data-view="audit">Auditoría</button>
+      </nav>
+      <div class="sidebar-foot"><span id="sideStatusDot" class="status-dot"></span><span id="sideStatusText">Sin Excel cargado</span></div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <button id="menuToggle" class="menu-toggle" aria-label="Abrir menú">☰</button>
+        <div><p class="eyebrow">MONTI · COMPRAS</p><h1 id="pageTitle">Inicio</h1></div>
+        <div class="top-actions"><button id="quickUpload" class="secondary-btn">Actualizar Excel</button><span id="statusChip" class="chip">Sin datos</span></div>
+      </header>
+
+      <main>
+        <section class="view active" data-view-panel="dashboard">
+          <div class="dashboard-hero card">
+            <div><p class="eyebrow">RESUMEN</p><h2>Qué necesita atención hoy</h2><p class="muted">El sistema usa el último Excel guardado y el stock cargado en este dispositivo.</p></div>
+            <button id="viewOrdersBtn" class="primary-btn">Ver próximos pedidos</button>
+          </div>
+          <div class="summary-grid four">
+            <article class="metric card"><span>Excel</span><strong id="dashExcelStatus">Sin cargar</strong><small id="dashExcelMeta">—</small></article>
+            <article class="metric card"><span>Ventas</span><strong id="salesCount">0</strong><small id="dashPeriod">—</small></article>
+            <article class="metric card"><span>Modificadores</span><strong id="modsCount">0</strong><small>Fudo</small></article>
+            <article class="metric card"><span>Alertas</span><strong id="alertCount">0</strong><small id="alertCaption">Sin revisar</small></article>
+          </div>
+          <section class="card"><div class="section-head"><div><p class="eyebrow">PRÓXIMOS PEDIDOS</p><h2>Calendario de compras</h2></div></div><div id="nextOrdersTable" class="table-wrap"><div class="empty">Cargá un Excel para ver próximos pedidos.</div></div></section>
+          <section class="card"><div class="section-head"><div><p class="eyebrow">ALERTAS</p><h2>Revisión rápida</h2></div></div><div id="alertsList" class="alert-list"><div class="empty">Todavía no hay datos para revisar.</div></div></section>
+        </section>
+
+        <section class="view" data-view-panel="fudo">
+          <div class="page-heading"><div><p class="eyebrow">DATOS FUDO</p><h2>Archivo de ventas</h2><p class="muted">El archivo original y los datos procesados quedan guardados localmente en este navegador.</p></div></div>
+          <section class="upload-card card">
+            <div class="upload-copy"><span class="upload-icon">↥</span><div><h3 id="fudoFileName">Todavía no se cargó un Excel</h3><p id="fileMeta" class="muted">Elegí el Excel completo exportado desde Fudo.</p></div></div>
+            <label class="primary-btn">Cargar / reemplazar Excel<input id="fileInput" type="file" accept=".xlsx,.xls" hidden /></label>
+          </section>
+          <div class="summary-grid four">
+            <article class="metric card"><span>Desde</span><strong id="dateFrom">—</strong></article>
+            <article class="metric card"><span>Hasta</span><strong id="dateTo">—</strong></article>
+            <article class="metric card"><span>Pollo válidas</span><strong id="chickenCount">0</strong></article>
+            <article class="metric card"><span>Carne válidas</span><strong id="beefCount">0</strong></article>
+          </div>
+          <section class="card"><div class="section-head"><div><p class="eyebrow">ARCHIVO GUARDADO</p><h2>Persistencia local</h2></div><button id="clearExcel" class="ghost-btn">Quitar archivo</button></div><div id="storageStatus" class="storage-box">Sin archivo guardado.</div></section>
+        </section>
+
+        <section class="view" data-view-panel="stock">
+          <div class="page-heading"><div><p class="eyebrow">STOCK</p><h2>Stock operativo</h2><p class="muted">Filtrá por proveedor y cargá cada insumo en la unidad indicada.</p></div><button id="saveStock" class="primary-btn">Guardar stock</button></div>
+          <section class="card"><div class="toolbar"><input id="stockSearch" class="search-input" placeholder="Buscar insumo…"><select id="stockProvider"><option value="all">Todos los proveedores</option><option>La Artesanal</option><option>Centro de Producción</option><option>Breaders</option><option>Packaging</option></select></div><div id="stockGrid" class="stock-table"></div></section>
+        </section>
+
+        <section class="view" data-view-panel="orders">
+          <div class="page-heading"><div><p class="eyebrow">PEDIDOS</p><h2>Próximas compras</h2><p id="planMeta" class="muted">Usa Excel + stock + reglas de cobertura.</p></div><button id="generateOrders" class="primary-btn">Actualizar cálculo</button></div>
+          <div id="orderTabs" class="tabs"><button class="tab active" data-order-filter="all">Todos</button><button class="tab" data-order-filter="artesanal">La Artesanal</button><button class="tab" data-order-filter="cdp">CDP</button><button class="tab" data-order-filter="breaders">Breaders</button><button class="tab" data-order-filter="packaging">Packaging</button></div>
+          <div id="ordersGrid" class="orders-layout"><div class="empty card">Importá un Excel para calcular pedidos.</div></div>
+        </section>
+
+        <section class="view" data-view-panel="recipes">
+          <div class="page-heading"><div><p class="eyebrow">RECETAS</p><h2>Gramajes y rendimientos</h2><p class="muted">Primera vista editable. En la siguiente iteración conectaremos estos valores directamente con el motor.</p></div></div>
+          <section class="card"><div class="simple-table"><div class="table-row head"><span>Preparación</span><span>Gramaje</span><span>Estado</span></div><div class="table-row"><span>Tuco</span><strong>220 g</strong><span class="badge ok">Vigente</span></div><div class="table-row"><span>Bolognesa</span><strong>250 g</strong><span class="badge ok">Vigente</span></div><div class="table-row"><span>Blanca</span><strong>220 g</strong><span class="badge ok">Vigente</span></div><div class="table-row"><span>Rosa</span><strong>220 g</strong><span class="badge ok">Vigente</span></div><div class="table-row"><span>Mix Quesos</span><strong>220 g</strong><span class="badge ok">Vigente</span></div></div></section>
+        </section>
+
+        <section class="view" data-view-panel="config">
+          <div class="page-heading"><div><p class="eyebrow">CONFIGURACIÓN</p><h2>Parámetros del motor</h2></div></div>
+          <div class="settings-grid"><article class="card"><h3>Cobertura</h3><p class="muted">Margen de seguridad aplicado al cálculo.</p><strong class="big-value">20%</strong></article><article class="card"><h3>Breaders</h3><p class="muted">Caja pollo 5 kg · 250 g cada milanesa.</p><strong class="big-value">20 unidades</strong></article><article class="card"><h3>Focaccia</h3><p class="muted">Rendimiento acompañamiento / sandwich.</p><strong class="big-value">28 / 8</strong></article><article class="card"><h3>Volcán</h3><p class="muted">Pedido de panes.</p><strong class="big-value">Caja x12</strong></article></div>
+        </section>
+
+        <section class="view" data-view-panel="audit">
+          <div class="page-heading"><div><p class="eyebrow">AUDITORÍA</p><h2>Lectura y controles</h2></div></div>
+          <section class="card"><div id="sheetAudit" class="audit-list"><div class="empty">Importá un Excel para ver la auditoría.</div></div></section>
+        </section>
+      </main>
+    </div>
+  </div>
   <script src="engine.js"></script><script src="app.js"></script>
 </body>
 </html>
