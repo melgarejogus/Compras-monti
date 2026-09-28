@@ -1,0 +1,9 @@
+{
+  "name": "Compras Monti",
+  "short_name": "Monti",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0e0f11",
+  "theme_color": "#0e0f11",
+  "description": "Planificador web de compras y stock para Monti"
+}
