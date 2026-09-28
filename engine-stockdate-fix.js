@@ -5,7 +5,6 @@
   const addDays=(d,k)=>{const x=new Date(d);x.setHours(12,0,0,0);x.setDate(x.getDate()+k);return x};
   const day=d=>d.getDay();
   const iso=d=>{const x=new Date(d);x.setHours(12,0,0,0);return x.toISOString().slice(0,10)};
-  const sameDay=(a,b)=>iso(a)===iso(b);
   const safety=.20;
 
   const artProjection={
@@ -37,15 +36,13 @@
     return d;
   }
   function datesAfterSnapshotUntilDelivery(snapshot,delivery){
-    const out=[];
-    let d=addDays(snapshot,1);
+    const out=[]; let d=addDays(snapshot,1);
     const end=new Date(delivery);end.setHours(12,0,0,0);
     while(d<end){out.push(new Date(d));d=addDays(d,1)}
     return out;
   }
   function fmtDate(d){return new Date(d).toLocaleDateString('es-AR')}
 
-  const oldArtOrder=window.MontiEngine.artOrder;
   window.MontiEngine.artOrder=function(stock,now=new Date()){
     const p=window.MontiEngine.plans(now).art;
     const snap=snapshotDate(now);
@@ -62,21 +59,68 @@
       if(it.name==='Pan de volcán')suggested=Math.ceil(need/12);
       else if(it.round===5)suggested=Math.ceil(need/5)*5;
       else suggested=Math.ceil(need);
-      lines.push({
-        name:it.name,qty:suggested,unit:it.unit,forecast:cycle,stock:st,
-        note:`stock al ${fmtDate(snap)} · consume antes ${pre.toFixed(1)} · cobertura +20%`
-      });
+      lines.push({name:it.name,qty:suggested,unit:it.unit,forecast:cycle,stock:st,note:`stock al ${fmtDate(snap)} · consume antes ${pre.toFixed(1)} · cobertura +20%`});
     });
     return {provider:'La Artesanal',plan:p,lines,stockSnapshotDate:snap};
+  };
+
+  function isGnocchi29Product(name){
+    const k=norm(name);
+    return k.includes('noqui') || k.includes('gnoc') || k.includes('volcan');
+  }
+  function historicalRowsForDate(sales,dateIso){
+    const matches=(sales||[]).filter(s=>s && !s.modifier && !s.cancelled && s.date && iso(s.date)===dateIso && isGnocchi29Product(s.product));
+    const additions=matches.filter(s=>norm(s.source)==='adiciones');
+    return additions.length?additions:matches;
+  }
+
+  // Día 29: el refuerzo se calcula desde ventas reales de días 29 anteriores.
+  // Incluye platos de ñoquis y Volcán de ñoquis. Si existen filas en Adiciones,
+  // se usan como detalle real para evitar duplicar con otras hojas.
+  window.MontiEngine.day29Order=function(stock,normal,sales,now=new Date()){
+    const p=window.MontiEngine.plans(now).day29;
+    const target=p.delivery;
+    const historicalDates=[...new Set((sales||[])
+      .filter(s=>s && !s.modifier && !s.cancelled && s.date && s.date<target && s.date.getDate()===29 && isGnocchi29Product(s.product))
+      .map(s=>iso(s.date)))].sort();
+
+    if(!historicalDates.length){
+      return {provider:'La Artesanal · Día 29',plan:p,lines:[],warning:'No encontré ventas históricas de ñoquis/Volcán de días 29 en el Excel.'};
+    }
+
+    const historicalPortions=historicalDates.map(ds=>historicalRowsForDate(sales,ds).reduce((a,s)=>a+n(s.qty),0));
+    const avgPortions=historicalPortions.reduce((a,b)=>a+b,0)/historicalPortions.length;
+    const specialKg=avgPortions*0.25;
+
+    // La entrega normal que contiene el 29 debe cubrir también los días posteriores
+    // de su ciclo (ej. 29/9 a 2/10). Reemplazamos sólo el consumo normal del 29.
+    const coverage=normal?.plan?.coverage?.length?normal.plan.coverage:p.coverage;
+    const after29=coverage.filter(d=>d.getTime()>target.getTime()).reduce((a,d)=>a+(artProjection.noquis[day(d)]||0),0);
+    const targetKg=(specialKg+after29)*(1+safety);
+
+    const normalIncoming=normal?.lines?.find(x=>norm(x.name)==='noquis')?.qty||0;
+    const currentStock=n(stock['Ñoquis']);
+    const additionalKg=Math.max(0,targetKg-(currentStock+normalIncoming));
+
+    const historicalVolcan=historicalDates.map(ds=>historicalRowsForDate(sales,ds).filter(s=>norm(s.product).includes('volcan')).reduce((a,s)=>a+n(s.qty),0));
+    const avgVolcan=historicalVolcan.reduce((a,b)=>a+b,0)/historicalVolcan.length;
+    const normalPanIncoming=normal?.lines?.find(x=>norm(x.name)==='pan de volcan')?.qty||0;
+    const normalPanUnits=normalPanIncoming*12;
+    const after29Panes=coverage.filter(d=>d.getTime()>target.getTime()).reduce((a,d)=>a+(artProjection['pan de volcan'][day(d)]||0),0);
+    const targetPanUnits=(avgVolcan+after29Panes)*(1+safety);
+    const currentPan=n(stock['Pan de volcán']);
+    const additionalPanBoxes=Math.max(0,Math.ceil((targetPanUnits-(currentPan+normalPanUnits))/12));
+
+    const lines=[];
+    if(additionalKg>0)lines.push({name:'Ñoquis',qty:Math.ceil(additionalKg/5)*5,unit:'kg',forecast:specialKg+after29,stock:currentStock,note:`Día 29: promedio histórico ${avgPortions.toFixed(0)} porciones = ${specialKg.toFixed(1)} kg · ${historicalDates.length} fecha(s) · +20%`});
+    if(additionalPanBoxes>0)lines.push({name:'Pan de volcán',qty:additionalPanBoxes,unit:'cajas x12',forecast:avgVolcan+after29Panes,stock:currentPan,note:`Día 29: promedio histórico ${avgVolcan.toFixed(0)} Volcanes + días posteriores · +20%`});
+
+    return {provider:'La Artesanal · Día 29',plan:p,lines,day29Stats:{historicalDates,avgPortions,specialKg,avgVolcan,targetKg}};
   };
 
   function markStockNow(){localStorage.setItem(STOCK_META_KEY,new Date().toISOString())}
   const save=document.getElementById('saveStock');
   if(save)save.addEventListener('click',markStockNow,true);
-
-  // Para instalaciones previas sin fecha de stock, el stock actual se toma como relevado hoy.
   if(!localStorage.getItem(STOCK_META_KEY))markStockNow();
-
-  // Recalcula la vista abierta con la regla corregida una vez cargado este parche.
   if(typeof window.generateOrders==='function')window.generateOrders();
 })();
