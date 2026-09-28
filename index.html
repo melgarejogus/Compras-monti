@@ -9,77 +9,16 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <p class="eyebrow">MONTI · COMPRAS</p>
-      <h1>Planificador de pedidos</h1>
-    </div>
-    <span id="statusChip" class="chip">Sin datos</span>
-  </header>
-
+  <header class="topbar"><div><p class="eyebrow">MONTI · COMPRAS</p><h1>Planificador de pedidos</h1></div><span id="statusChip" class="chip">Sin datos</span></header>
   <main>
-    <section class="hero card">
-      <div>
-        <h2>Importar Fudo</h2>
-        <p>Subí el Excel completo de Fudo. La web detecta ventas, adiciones y modificadores y guarda el último archivo procesado en este dispositivo.</p>
-      </div>
-      <label class="primary-btn">
-        Seleccionar Excel
-        <input id="fileInput" type="file" accept=".xlsx,.xls" hidden />
-      </label>
-      <div id="fileMeta" class="muted">Todavía no se importó ningún archivo.</div>
-    </section>
-
-    <section class="summary-grid">
-      <article class="metric card"><span>Ventas</span><strong id="salesCount">0</strong></article>
-      <article class="metric card"><span>Modificadores</span><strong id="modsCount">0</strong></article>
-      <article class="metric card"><span>Desde</span><strong id="dateFrom">—</strong></article>
-      <article class="metric card"><span>Hasta</span><strong id="dateTo">—</strong></article>
-    </section>
-
-    <section class="card">
-      <div class="section-head">
-        <div><p class="eyebrow">AUDITORÍA</p><h2>Lectura del Excel</h2></div>
-      </div>
-      <div id="sheetAudit" class="audit-list"><div class="empty">Importá un Excel para ver la auditoría.</div></div>
-    </section>
-
-    <section class="card">
-      <div class="section-head">
-        <div><p class="eyebrow">MILANESAS</p><h2>Control de tipo</h2></div>
-      </div>
-      <div class="summary-grid two">
-        <article class="metric inset"><span>Pollo válidas</span><strong id="chickenCount">0</strong></article>
-        <article class="metric inset"><span>Carne válidas</span><strong id="beefCount">0</strong></article>
-      </div>
-      <p class="muted">Sólo cuenta filas del grupo “Tipo de milanesa”, excluyendo canceladas.</p>
-    </section>
-
-    <section class="card">
-      <div class="section-head">
-        <div><p class="eyebrow">STOCK</p><h2>Stock operativo</h2></div>
-        <button id="saveStock" class="secondary-btn">Guardar stock</button>
-      </div>
-      <div id="stockGrid" class="stock-grid"></div>
-    </section>
-
-    <section class="card">
-      <div class="section-head">
-        <div><p class="eyebrow">PEDIDOS</p><h2>Proveedores</h2></div>
-      </div>
-      <div class="provider-grid">
-        <article class="provider"><h3>La Artesanal</h3><p>Pastas y volcán.</p><span>Migración de cálculo en curso</span></article>
-        <article class="provider"><h3>Centro de Producción</h3><p>Salsas, Brasato, Focaccia, empanadas y otros.</p><span>Migración de cálculo en curso</span></article>
-        <article class="provider"><h3>Breaders</h3><p>Milanesas de pollo por caja.</p><span id="breadersHint">Esperando Excel</span></article>
-        <article class="provider"><h3>Packaging</h3><p>Envases, cajas, bolsas y consumibles.</p><span>Migración de cálculo en curso</span></article>
-      </div>
-    </section>
+    <section class="hero card"><div><h2>Importar Fudo</h2><p>Subí el Excel completo de Fudo. La web calcula pedidos con el motor migrado desde la app Android.</p></div><label class="primary-btn">Seleccionar Excel<input id="fileInput" type="file" accept=".xlsx,.xls" hidden /></label><div id="fileMeta" class="muted">Todavía no se importó ningún archivo.</div></section>
+    <section class="summary-grid"><article class="metric card"><span>Ventas</span><strong id="salesCount">0</strong></article><article class="metric card"><span>Modificadores</span><strong id="modsCount">0</strong></article><article class="metric card"><span>Desde</span><strong id="dateFrom">—</strong></article><article class="metric card"><span>Hasta</span><strong id="dateTo">—</strong></article></section>
+    <section class="card"><div class="section-head"><div><p class="eyebrow">AUDITORÍA</p><h2>Lectura del Excel</h2></div></div><div id="sheetAudit" class="audit-list"><div class="empty">Importá un Excel para ver la auditoría.</div></div></section>
+    <section class="card"><div class="section-head"><div><p class="eyebrow">MILANESAS</p><h2>Control de tipo</h2></div></div><div class="summary-grid two"><article class="metric inset"><span>Pollo válidas</span><strong id="chickenCount">0</strong></article><article class="metric inset"><span>Carne válidas</span><strong id="beefCount">0</strong></article></div><p class="muted">Sólo grupo “Tipo de milanesa”, sin canceladas.</p></section>
+    <section class="card" id="stock"><div class="section-head"><div><p class="eyebrow">STOCK</p><h2>Stock operativo</h2></div><button id="saveStock" class="secondary-btn">Guardar stock</button></div><p class="muted">Cargá el stock en la unidad indicada. El motor descuenta este stock al generar el pedido.</p><div id="stockGrid" class="stock-grid"></div></section>
+    <section class="card" id="orders"><div class="section-head"><div><p class="eyebrow">PEDIDOS</p><h2>Pedidos sugeridos</h2></div><button id="generateOrders" class="primary-btn button">Calcular pedidos</button></div><div id="planMeta" class="muted">Importá el Excel y cargá stock.</div><div id="ordersGrid" class="provider-grid"></div></section>
   </main>
-
-  <nav class="bottom-nav">
-    <a href="#">Inicio</a><a href="#stockGrid">Stock</a><a href="#">Pedidos</a><a href="#">Config</a>
-  </nav>
-
-  <script src="app.js"></script>
+  <nav class="bottom-nav"><a href="#">Inicio</a><a href="#stock">Stock</a><a href="#orders">Pedidos</a><a href="#orders">Config</a></nav>
+  <script src="engine.js"></script><script src="app.js"></script>
 </body>
 </html>
