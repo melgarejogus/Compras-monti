@@ -21,8 +21,6 @@
     const avgPortions=historicalPortions.reduce((a,b)=>a+b,0)/historicalPortions.length;
     const specialKg=avgPortions*.25;
     const after29=coverage.filter(d=>d>target).reduce((a,d)=>a+(noquiProj[day(d)]||0),0);
-    // Regla especial 29: el promedio histórico pico NO recibe otro +20%.
-    // El margen se aplica sólo al consumo normal posterior al 29.
     const targetKg=specialKg+after29*1.20;
     const currentStock=n(stock['Ñoquis']);
     const finalKg=Math.max(0,Math.ceil(Math.max(0,targetKg-currentStock)/5)*5);
@@ -49,5 +47,35 @@
     if(refuerzoPan>0)lines.push({name:'Pan volcán (refuerzo incluido arriba)',qty:refuerzoPan,unit:'cajas x12',note:`Total final de Pan de volcán: ${finalPanBoxes} cajas x12`});
     return {provider:'La Artesanal · Día 29',plan:p,lines,day29Stats:{historicalDates,historicalPortions,avgPortions,specialKg,avgVolcan,targetKg,finalKg,finalPanBoxes}};
   };
+
+  // CDP: el especial del 29 sólo pertenece a una compra si el 29 está realmente
+  // dentro de las fechas que ESA entrega debe cubrir. Si hoy es 29 y la entrega es
+  // mañana (30), no se vuelve a comprar el consumo especial de hoy.
+  const cdpOrderBeforeCycleGuard=E.cdpOrder;
+  E.cdpOrder=function(data,stock,now=new Date(),special29=false){
+    if(special29)return cdpOrderBeforeCycleGuard(data,stock,now,true);
+    const realPlans=E.plans(now);
+    const target29=realPlans?.day29?.delivery;
+    const coverage=realPlans?.cdp?.coverage||[];
+    const day29BelongsToThisDelivery=!!target29&&coverage.some(d=>iso(d)===iso(target29));
+    if(day29BelongsToThisDelivery)return cdpOrderBeforeCycleGuard(data,stock,now,false);
+
+    const originalPlans=E.plans;
+    E.plans=function(t){
+      const p=originalPlans(t);
+      const fake29=new Date(p.day29.delivery);
+      fake29.setMonth(fake29.getMonth()+1);
+      return {...p,day29:{...p.day29,delivery:fake29}};
+    };
+    try{
+      const result=cdpOrderBeforeCycleGuard(data,stock,now,false);
+      if(result?.day29Stats)result.day29Stats={...result.day29Stats,applied:false};
+      if(result)result.warning='Día 29 NO integrado en esta entrega de CDP: el 29 no está dentro de su cobertura. Se calculan sólo los días que esta entrega puede abastecer.';
+      return result;
+    }finally{
+      E.plans=originalPlans;
+    }
+  };
+
   if(typeof window.generateOrders==='function')window.generateOrders();
 })();
