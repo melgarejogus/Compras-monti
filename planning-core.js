@@ -52,7 +52,7 @@ window.MontiPlanningCore=(()=>{
     if(dm>=close)return 1;
     return (dm-open)/(close-open);
   }
-  function consumptionWeights(snapshot,delivery,{consumeDeliveryDay=false,deliveryHour=11}={}){
+  function consumptionWeights(snapshot,delivery,{consumeDeliveryDay=false,deliveryHour=11,consumeFullDeliveryDay=false}={}){
     const snap=new Date(snapshot),del=new Date(delivery),out=[];
     let d=dayStart(snap),end=dayStart(del);
     if(d>end)return out;
@@ -61,7 +61,12 @@ window.MontiPlanningCore=(()=>{
       if(sameDate(d,snap))weight=serviceFractionRemaining(snap);
       if(sameDate(d,del)){
         if(!consumeDeliveryDay)weight=0;
-        else if(sameDate(d,snap)){
+        else if(consumeFullDeliveryDay){
+          // Regla operativa: aunque el proveedor llegue a última hora, el stock nuevo
+          // se considera utilizable para el ciclo siguiente. Por eso el stock actual
+          // debe sostener el 100% del día de entrega.
+          weight=sameDate(d,snap)?serviceFractionRemaining(snap):1;
+        }else if(sameDate(d,snap)){
           const from=operationalMinute(snap),open=serviceOpen*60;
           let to=deliveryHour*60;if(to<120)to+=1440;
           weight=Math.max(0,Math.min(1,(to-Math.max(from,open))/((serviceClose-serviceOpen)*60)));
@@ -105,7 +110,11 @@ window.MontiPlanningCore=(()=>{
   }
 
   registerProvider('artesanal',{label:'La Artesanal',scheduleKnown:true,nextDelivery(now){const t=nextWeekday(now,2),s=nextWeekday(now,6);return t<s?t:s},consumeDeliveryDay:false,deliveryHour:11});
-  registerProvider('cdp',{label:'Centro de Producción',scheduleKnown:true,nextDelivery(now){let d=dayStart(new Date(now));while(![1,3,5].includes(d.getDay()))d=addDays(d,1);return d},consumeDeliveryDay:true,deliveryHour:23});
+  registerProvider('cdp',{
+    label:'Centro de Producción',scheduleKnown:true,
+    nextDelivery(now){let d=dayStart(new Date(now));while(![1,3,5].includes(d.getDay()))d=addDays(d,1);return d},
+    consumeDeliveryDay:true,deliveryHour:23,consumeFullDeliveryDay:true
+  });
   registerProvider('breaders',{label:'Breaders',scheduleKnown:true,nextDelivery(now){return nextWeekday(now,2)},consumeDeliveryDay:false,deliveryHour:11});
 
   // Papelería / envases: ambos se gestionan por separado del CDP.
