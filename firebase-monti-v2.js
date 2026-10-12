@@ -4,6 +4,9 @@ import { getFirestore, doc, getDoc, setDoc, serverTimestamp, collection, getDocs
 
 const config={apiKey:'AIzaSyCK5bTZLaKRa27YvRIXc5O3Q6pQHOz7XHo',authDomain:'monti-compras.firebaseapp.com',projectId:'monti-compras',storageBucket:'monti-compras.firebasestorage.app',messagingSenderId:'436016502476',appId:'1:436016502476:web:c6a861d2dfeb0100021469',measurementId:'G-63QJR32Q4C'};
 const adminUid='xCp3XpmIPVN6nVUFGO8LmQi0Sg33';
+// Identidades técnicas: crear estas dos cuentas desde Firebase Authentication.
+const staffAccounts=Object.freeze({encargado:'encargado@monti-compras.invalid',subencargado:'subencargado@monti-compras.invalid'});
+const accountEmail=value=>staffAccounts[value.toLowerCase()]||value;
 const auth=getAuth(initializeApp(config));
 const db=getFirestore(auth.app);
 const login=document.getElementById('firebaseLogin');
@@ -14,6 +17,7 @@ const stockKey='monti.web.stock.v3';
 const savedAtKey=stockKey+'.savedAt';
 let signedIn=false;
 let isAdmin=false;
+let authorized=false;
 const salesManifest=doc(db,'monti','fudo');
 const salesChunks=collection(db,'monti','fudo','chunks');
 const stockRef=doc(db,'monti','stock');
@@ -48,7 +52,7 @@ window.MontiCloud={
   return true;
  },
  async loadSales(){
-  if(!signedIn)throw Error('Ingresá con una cuenta autorizada.');
+  if(!signedIn||!authorized)throw Error('Ingresá con una cuenta autorizada.');
   const manifest=await getDoc(salesManifest);if(!manifest.exists())return null;
   const {version,count,meta,metaJson}=manifest.data();
   if(!version||!Number.isInteger(count)||count<1||count>200)throw Error('Índice de ventas inválido');
@@ -57,7 +61,7 @@ window.MontiCloud={
   return {data:JSON.parse(parts.map(p=>p.data().part).join('')),meta:metaJson?JSON.parse(metaJson):meta};
  },
  async saveStock(items){
-  if(!signedIn||!cloudReady)throw Error('Firebase todavía no está listo. No se guardó.');
+  if(!signedIn||!authorized||!cloudReady)throw Error('Usuario no autorizado o Firebase todavía no está listo. No se guardó.');
   const savedAt=new Date().toISOString();
   await setDoc(stockRef,{items,savedAt,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});
   const confirmed=await getDoc(stockRef);
@@ -72,20 +76,22 @@ window.MontiCloud={
 onAuthStateChanged(auth,async user=>{
  signedIn=!!user;
  isAdmin=signedIn&&user.uid===adminUid;
- login.style.display=signedIn?'none':'flex';
+ authorized=!!user&&(isAdmin||Object.values(staffAccounts).includes((user.email||'').toLowerCase()));
+ login.style.display=authorized?'none':'flex';
  logout.style.display=signedIn?'':'none';
- if(!signedIn){cloudReady=false;window.MontiRole?.(false);return}
+ if(!authorized){cloudReady=false;window.MontiRole?.(false);if(signedIn){showError('Cuenta sin autorización para Monti Compras.');await signOut(auth)}return}
  window.MontiRole?.(isAdmin);
  try{await restoreCloudStock()}catch(e){cloudReady=false;status('ERROR: no se pudo leer Firebase. No guardes hasta recuperar conexión.');console.warn('No se pudo recuperar stock de la nube',e)}
  try{const result=await window.MontiCloud.loadSales();if(result)window.MontiSalesLoaded?.(result.data,result.meta);else window.MontiSalesMissing?.()}catch(e){console.warn('No se pudieron cargar ventas desde Firebase',e);window.MontiSalesError?.(e)}
 });
 form.addEventListener('submit',async event=>{
  event.preventDefault();showError('Ingresando…');
- try{await signInWithEmailAndPassword(auth,document.getElementById('firebaseEmail').value.trim(),document.getElementById('firebasePassword').value);showError('')}
+ try{await signInWithEmailAndPassword(auth,accountEmail(document.getElementById('firebaseEmail').value.trim().toLowerCase()),document.getElementById('firebasePassword').value);showError('')}
  catch(e){showError('No se pudo iniciar sesión. Revisá el correo y la contraseña.')}
 });
 document.getElementById('firebaseReset').addEventListener('click',async()=>{
- const email=document.getElementById('firebaseEmail').value.trim();
+ const email=document.getElementById('firebaseEmail').value.trim().toLowerCase();
+ if(staffAccounts[email]){showError('El administrador debe restablecer la contraseña del personal.');return}
  if(!email){showError('Escribí tu correo electrónico primero.');return}
  try{await sendPasswordResetEmail(auth,email);showError('Si el correo está registrado, recibirás un enlace para recuperar la contraseña.')}
  catch(e){showError('No se pudo enviar el correo de recuperación. Intentá nuevamente.')}
