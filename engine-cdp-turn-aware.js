@@ -100,7 +100,7 @@
   const baseCdp=E.cdpOrder.bind(E);
   E.cdpOrder=function(data,stock,now=new Date(),special29=false){
     if(special29)return baseCdp(data,stock,now,true);
-    const snap=core.snapshotAt(now),p=E.plans(now).cdp;
+    const snap=new Date(now),p=E.plans(now).cdp;
     const snapDay=new Date(snap.getFullYear(),snap.getMonth(),snap.getDate());
     const delDay=new Date(p.delivery.getFullYear(),p.delivery.getMonth(),p.delivery.getDate());
     if(snap.getDate()!==29||snapDay>=delDay)return baseCdp(data,stock,now,false);
