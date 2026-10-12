@@ -1,6 +1,7 @@
 (()=>{
   const STOCK_KEY='monti.web.stock.v3';
   const fields=[
+    ['Rigatoni porciones','Rigatoni','porciones x200 g'],
     ['Ñoquis porciones','Ñoquis','porciones x250 g'],
     ['Fusiles porciones','Fusiles','porciones x200 g'],
     ['Macarrones porciones','Macarrones','porciones x200 g'],
