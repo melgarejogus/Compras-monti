@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function loggedIn() { return request.auth != null; }
+    function admin() { return loggedIn() && request.auth.uid == 'xCp3XpmIPVN6nVUFGO8LmQi0Sg33'; }
+
+    match /monti/stock {
+      allow read, write: if loggedIn();
+    }
+    match /monti/fudo {
+      allow read: if loggedIn();
+      allow write: if admin();
+      match /chunks/{chunkId} {
+        allow read: if loggedIn();
+        allow write: if admin();
+      }
+    }
+    match /{document=**} {
+      allow read, write: if admin();
+    }
+  }
+}
