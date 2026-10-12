@@ -35,7 +35,7 @@ function forecasts(sales,modifiers=[]){
  const days=new Map(),seenDates=new Map();
  const parentOrders=new Map();
  for(const p of sales||[]){if(p?.orderId&&!p.cancelled&&!p.modifier){const id=String(p.orderId);if(!parentOrders.has(id))parentOrders.set(id,[]);parentOrders.get(id).push(p)}}
- const resolved=new Set();
+ const resolved=new Set(),resolvedOrderSku=new Set();
  for(const m of modifiers||[]){
   if(m.cancelled||!m.date||!m.orderId)continue;
   const sku=classify(m.modifier);if(!sku)continue;
@@ -46,7 +46,7 @@ function forecasts(sales,modifiers=[]){
   const factor=sku==='Pan de volcán'?1:sku==='Ñoquis'?.25:sku==='Fusiles'||sku==='Macarrones'||sku==='Spaghetti'||sku==='Rigatoni'?.2:sku==='Ravioles pollo y verdura'||sku==='Ravioles de ricota'?.375:2/3;
   const key=sku+'|'+dateKey, unique=String(m.orderId)+'|'+sku+'|'+norm(m.modifier);
   if(resolved.has(unique))continue;
-  resolved.add(unique);days.set(key,(days.get(key)||0)+n(m.qty)*factor);seenDates.set(dateKey,date.getDay());
+  resolved.add(unique);resolvedOrderSku.add(String(m.orderId)+'|'+sku);days.set(key,(days.get(key)||0)+n(m.qty)*factor);seenDates.set(dateKey,date.getDay());
  }
  for(const s of sales||[]){
   if(!s?.date||s.cancelled||s.modifier||s.date.getDate()===29)continue;
@@ -55,7 +55,7 @@ function forecasts(sales,modifiers=[]){
   if(source==='adiciones')continue;
   const sku=classify(s.product);
   if(!sku)continue;
-  if(s.orderId&&resolved.size&&[...resolved].some(k=>k.startsWith(String(s.orderId)+'|'+sku+'|')))continue;
+  if(s.orderId&&resolvedOrderSku.has(String(s.orderId)+'|'+sku))continue;
   // Los platos genéricos requieren leer modificadores; no atribuirlos a un SKU por su nombre comercial.
   if(/pastas clasicas|pastas clasicas|pastas simples|combo/i.test(norm(s.product)))continue;
   const key=sku+'|'+dateKey,qty=n(s.qty);
