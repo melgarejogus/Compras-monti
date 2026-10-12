@@ -31,13 +31,20 @@ function classify(product){
  for(const d of defs.slice(0,-1))if(synonyms[d.name].test(k))return d.name;
  return null;
 }
-function forecasts(sales,modifiers=[]){
+function forecasts(sales,modifiers=[],now=new Date()){
  const days=new Map(),seenDates=new Map();
+ const end=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+ const start=new Date(end);start.setDate(start.getDate()-60);
+ const eligibleDate=value=>{const d=new Date(value);if(Number.isNaN(d.getTime()))return false;const day=new Date(d.getFullYear(),d.getMonth(),d.getDate());return day>=start&&day<end&&day.getDate()!==29&&!(day.getFullYear()===2026&&day.getMonth()===9&&day.getDate()===5)};
+ // El 05/10/2026 hubo liquidación extraordinaria 2x1 de volcanes del 29.
+ // Excluir ese día del promedio para no distorsionar la demanda habitual.
  const parentOrders=new Map();
+ // Denominador: todos los días con ventas de Adiciones, aun sin pastas.
+ for(const s of sales||[]){if(s?.date&&!s.cancelled&&!s.modifier&&norm(s.source||'')==='adiciones'&&eligibleDate(s.date)){const d=new Date(s.date);seenDates.set([d.getFullYear(),d.getMonth()+1,d.getDate()].join('-'),d.getDay());}}
  for(const p of sales||[]){if(p?.orderId&&!p.cancelled&&!p.modifier){const id=String(p.orderId);if(!parentOrders.has(id))parentOrders.set(id,[]);parentOrders.get(id).push(p)}}
  const resolved=new Set(),resolvedOrderSku=new Set();
  for(const m of modifiers||[]){
-  if(m.cancelled||!m.date||!m.orderId||new Date(m.date).getDate()===29)continue;
+  if(m.cancelled||!m.date||!m.orderId||!eligibleDate(m.date))continue;
   if(norm(m.group)!=='tipo de pastas')continue;
   const sku=classify(m.modifier);if(!sku||sku==='Pan de volcán')continue;
   const parents=parentOrders.get(String(m.orderId))||[];
@@ -50,7 +57,7 @@ function forecasts(sales,modifiers=[]){
   resolved.add(unique);resolvedOrderSku.add(String(m.orderId)+'|'+norm(m.product)+'|'+sku);days.set(key,(days.get(key)||0)+n(m.qty)*factor);seenDates.set(dateKey,date.getDay());
  }
  for(const s of sales||[]){
-  if(!s?.date||s.cancelled||s.modifier||s.date.getDate()===29)continue;
+  if(!s?.date||s.cancelled||s.modifier||!eligibleDate(s.date))continue;
   const date=new Date(s.date),dateKey=[date.getFullYear(),date.getMonth()+1,date.getDate()].join('-');
   const source=norm(s.source||'');
   // Adiciones contiene los productos vendidos; Ventas solo resume tickets.
@@ -100,7 +107,7 @@ function effectiveStock(stock,d){
 E.artOrder=function(stock,now=new Date(),sales=[],modifiers=[]){
  // Regla operativa: stock manual vigente al consultar; proyección siempre desde reloj del dispositivo.
  const p=E.plans(now).art,snapshot=new Date(now),cfg=core.provider('artesanal');
- const avg=forecasts(sales,modifiers),lines=[];
+ const avg=forecasts(sales,modifiers,now),lines=[];
  for(const d of defs){
   const st=effectiveStock(stock,d),daily=date=>avg[d.name][date.getDay()]||0;
   const pre=core.projectedStock({currentStock:st,snapshot,delivery:p.delivery,dailyDemand:daily,schedule:cfg});
