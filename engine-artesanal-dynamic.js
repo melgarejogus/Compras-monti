@@ -57,11 +57,7 @@ function forecasts(sales,modifiers=[]){
   let sku=classify(s.product);
   const label=norm(s.product);
   // Recetas conocidas: un plato de pasta por cada unidad del producto, salvo promos de dos platos.
-  if(/pastamila|pasta mila/.test(label))sku='Spaghetti';
-  if(/combo ravioles/.test(label))sku='Ravioles de ricota';
-  if(/grand raviolo/.test(label))sku='Ravioles de ricota';
   if(/miercoles- mila \+ spag/.test(label))sku='Spaghetti';
-  if(/viernes- ravioles/.test(label))sku='Ravioles de ricota';
   if(/mac & mila|mac and cheese|mac & cheese|mac monti|mac campeones|mac burguer/.test(label))sku='Macarrones';
   if(/combo tallarines/.test(label))sku='Spaghetti';
   if(/2 platos de fusiles|2 fusilis para compartir/.test(label))sku='Fusiles';
@@ -106,6 +102,6 @@ E.artOrder=function(stock,now=new Date(),sales=[],modifiers=[]){
    note:'stock '+st.toFixed(2)+' · consumo hasta entrega '+pre.preConsumption.toFixed(2)+' · demanda cobertura '+demand.toFixed(2)+' · reserva 20% · pedido '+qty});
  }
  return {provider:'La Artesanal',plan:p,lines,stockSnapshotDate:snapshot,
- warning:(!sales?.length?'Sin ventas importadas para proyección. ':'')+'Los modificadores de combos se imputan por Id. Venta; revisar productos sin asociación y feriados extraordinarios.'};
+ warning:(!sales?.length?'Sin ventas importadas para proyección. ':'')+'Validación pendiente de recetas ambiguas: Pastamila, Combo Ravioles, Grand Raviolo y viernes ravioles; no asumir relleno o tipo de pasta.'};
 };
 })();
