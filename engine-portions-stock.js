@@ -8,6 +8,7 @@
   // Stock porcionado de La Artesanal. Estos campos son parte del stock real y se
   // convierten automáticamente a kg/cajas antes de calcular el pedido.
   const prepared=[
+    {base:'Rigatoni',key:'Rigatoni porciones',label:'porciones x200 g',eq:.20},
     {base:'Ñoquis',key:'Ñoquis porciones',label:'porciones x250 g',eq:.25},
     {base:'Fusiles',key:'Fusiles porciones',label:'porciones x200 g',eq:.20},
     {base:'Macarrones',key:'Macarrones porciones',label:'porciones x200 g',eq:.20},
@@ -74,7 +75,7 @@
       const equiv=qty*p.eq;
       out[p.base]=n(out[p.base])+equiv;
       details[p.base]??=[];
-      const unit=['Ñoquis','Fusiles','Macarrones','Spaghetti'].includes(p.base)?'kg':'cajas';
+      const unit=['Ñoquis','Fusiles','Macarrones','Spaghetti','Rigatoni'].includes(p.base)?'kg':'cajas';
       details[p.base].push(`${qty} ${p.label} = ${equiv.toFixed(2)} ${unit}`);
     });
     return {stock:out,details};
