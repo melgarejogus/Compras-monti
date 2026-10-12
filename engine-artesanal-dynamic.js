@@ -35,11 +35,13 @@ function forecasts(sales){
  const days=new Map(),seenDates=new Map();
  for(const s of sales||[]){
   if(!s?.date||s.cancelled||s.modifier||s.date.getDate()===29)continue;
-  const date=new Date(s.date),dateKey=date.toLocaleDateString('en-CA');
+  const date=new Date(s.date),dateKey=[date.getFullYear(),date.getMonth()+1,date.getDate()].join('-');
   const source=norm(s.source||'');
   if(source==='adiciones')continue;
   const sku=classify(s.product);
   if(!sku)continue;
+  // Los platos genéricos requieren leer modificadores; no atribuirlos a un SKU por su nombre comercial.
+  if(/pastas clasicas|pastas clasicas|pastas simples|combo/i.test(norm(s.product)))continue;
   const key=sku+'|'+dateKey,qty=n(s.qty);
   const factor=sku==='Pan de volcán'?1:sku==='Ñoquis'?.25:sku==='Fusiles'||sku==='Macarrones'||sku==='Spaghetti'||sku==='Rigatoni'?.2:sku==='Ravioles pollo y verdura'||sku==='Ravioles de ricota'?.375:2/3;
   days.set(key,(days.get(key)||0)+qty*factor);
@@ -74,6 +76,6 @@ E.artOrder=function(stock,now=new Date(),sales=[]){
    note:'stock '+st.toFixed(2)+' · consumo hasta entrega '+pre.preConsumption.toFixed(2)+' · demanda cobertura '+demand.toFixed(2)+' · reserva 20% · pedido '+qty});
  }
  return {provider:'La Artesanal',plan:p,lines,stockSnapshotDate:snapshot,
- warning:(!sales?.length?'Sin ventas importadas para proyección. ':'')+'Proyección por día de semana; revisar combos y feriados extraordinarios.'};
+ warning:(!sales?.length?'Sin ventas importadas para proyección. ':'')+'PROVISIONAL: falta integrar modificadores de tipo de pasta y auditar combos; no usar como pedido definitivo.'};
 };
 })();
