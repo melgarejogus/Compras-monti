@@ -119,7 +119,10 @@ E.artOrder=function(stock,now=new Date(),sales=[],modifiers=[]){
   if(d.name==='Rigatoni'&&p.coverage.length===4)demand=Math.max(demand,6);
   const need=Math.max(0,demand*1.2-pre.projected);
   const pack=d.volcan?12:d.kg?5:1;
-  let qty=d.volcan?Math.ceil(need/12):d.kg?Math.ceil(need/5)*5:Math.ceil(need);
+  // Para pasta a granel, solo subir al siguiente bloque de 5 kg si el exceso supera 30% de un bloque (1,5 kg).
+  // El primer bloque de 5 kg se pide siempre que haya necesidad positiva.
+  const pastaBlocks=need>0?Math.max(1,Math.floor(need/5)+(need%5>1.5+1e-9?1:0)):0;
+  let qty=d.volcan?Math.ceil(need/12):d.kg?pastaBlocks*5:Math.ceil(need);
   if(d.piecesPerBox){
    const remainingPieces=Math.max(0,Math.floor(pre.projected*d.piecesPerBox+1e-7));
    const targetPlates=Math.ceil(demand*1.2*d.piecesPerBox/d.piecesPerPlate-1e-9);
