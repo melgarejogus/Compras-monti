@@ -53,7 +53,8 @@ function forecasts(sales,modifiers=[]){
   if(!s?.date||s.cancelled||s.modifier||s.date.getDate()===29)continue;
   const date=new Date(s.date),dateKey=[date.getFullYear(),date.getMonth()+1,date.getDate()].join('-');
   const source=norm(s.source||'');
-  if(source==='adiciones')continue;
+  // Adiciones contiene los productos vendidos; Ventas solo resume tickets.
+  if(source==='ventas')continue;
   let sku=classify(s.product);
   const label=norm(s.product);
   // Recetas conocidas: un plato de pasta por cada unidad del producto, salvo promos de dos platos.
