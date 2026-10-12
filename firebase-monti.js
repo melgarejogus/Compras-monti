@@ -44,17 +44,17 @@ window.MontiCloud={
   if(chunks.length>200)throw Error('El Excel procesado es demasiado grande para sincronizar.');
   const version=Date.now().toString(36)+'-'+auth.currentUser.uid.slice(0,6);
   for(let i=0;i<chunks.length;i+=200){const batch=writeBatch(db);chunks.slice(i,i+200).forEach((part,j)=>batch.set(doc(salesChunks,version+'_'+(i+j)),{part}));await batch.commit()}
-  await setDoc(salesManifest,{version,count:chunks.length,meta:{...meta,sheets:(meta.sheets||[]).map(entry=>({name:String(entry[0]||''),rows:Number(entry[1]||0)}))},updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});
+  await setDoc(salesManifest,{version,count:chunks.length,metaJson:JSON.stringify(meta),updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});
   return true;
  },
  async loadSales(){
   if(!signedIn)throw Error('Ingresá con una cuenta autorizada.');
   const manifest=await getDoc(salesManifest);if(!manifest.exists())return null;
-  const {version,count,meta}=manifest.data();
+  const {version,count,meta,metaJson}=manifest.data();
   if(!version||!Number.isInteger(count)||count<1||count>200)throw Error('Índice de ventas inválido');
   const parts=await Promise.all(Array.from({length:count},(_,i)=>getDoc(doc(salesChunks,version+'_'+i))));
   if(parts.some(p=>!p.exists()))throw Error('Faltan bloques de ventas en Firebase');
-  return {data:JSON.parse(parts.map(p=>p.data().part).join('')),meta};
+  return {data:JSON.parse(parts.map(p=>p.data().part).join('')),meta:metaJson?JSON.parse(metaJson):meta};
  },
  async saveStock(items){
   if(!signedIn||!cloudReady)throw Error('Firebase todavía no está listo. No se guardó.');
