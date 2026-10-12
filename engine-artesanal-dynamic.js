@@ -37,7 +37,7 @@ function forecasts(sales,modifiers=[]){
  for(const p of sales||[]){if(p?.orderId&&!p.cancelled&&!p.modifier){const id=String(p.orderId);if(!parentOrders.has(id))parentOrders.set(id,[]);parentOrders.get(id).push(p)}}
  const resolved=new Set(),resolvedOrderSku=new Set();
  for(const m of modifiers||[]){
-  if(m.cancelled||!m.date||!m.orderId)continue;
+  if(m.cancelled||!m.date||!m.orderId||new Date(m.date).getDate()===29)continue;
   if(norm(m.group)!=='tipo de pastas')continue;
   const sku=classify(m.modifier);if(!sku||sku==='Pan de volcán')continue;
   const parents=parentOrders.get(String(m.orderId))||[];
@@ -60,6 +60,7 @@ function forecasts(sales,modifiers=[]){
   // Recetas conocidas: un plato de pasta por cada unidad del producto, salvo promos de dos platos.
   if(/pastamila|pasta mila/.test(label))sku='Spaghetti';
   if(/combo ravioles/.test(label))sku='Ravioles de ricota';
+  if(/noquis veganos|ñoquis veganos/.test(label))continue;
   if(/grand brasato|brasato raviolo/.test(label))continue;
   if(/miercoles- mila \+ spag/.test(label))sku='Spaghetti';
   if(/mac & mila|mac and cheese|mac & cheese|mac monti|mac campeones|mac burguer/.test(label))sku='Macarrones';
