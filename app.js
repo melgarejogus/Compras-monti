@@ -9,7 +9,7 @@ let cloudSalesStatus='Esperando datos de Firebase…';
 let cloudSalesLoaded=false;
 let currentAdmin=false;
 window.MontiRole=admin=>{currentAdmin=admin;document.querySelectorAll('[data-admin-only]').forEach(el=>el.style.display=admin?'':'none');if(!admin&&document.querySelector('.view.active')?.dataset.viewPanel==='fudo')navigate('dashboard')};
-window.MontiSalesLoaded=(data,meta)=>{parsedData=reviveParsed(data);currentFileMeta=meta;cloudSalesLoaded=true;cloudSalesStatus='Ventas sincronizadas desde Firebase ✓';updateFudoUi();renderDashboard();generateOrders()};
+window.MontiSalesLoaded=(data,meta)=>{parsedData=reviveParsed(data);currentFileMeta={...meta,sheets:(meta.sheets||[]).map(entry=>Array.isArray(entry)?entry:[entry.name,entry.rows])};cloudSalesLoaded=true;cloudSalesStatus='Ventas sincronizadas desde Firebase ✓';updateFudoUi();renderDashboard();generateOrders()};
 window.MontiSalesMissing=()=>{cloudSalesStatus='Todavía no hay ventas publicadas en Firebase';if(!currentAdmin){parsedData=null;currentFileMeta=null;updateFudoUi();renderDashboard();generateOrders()}};
 window.MontiSalesError=()=>{cloudSalesStatus='ERROR: no se pudieron recuperar ventas de Firebase';if(!currentAdmin){parsedData=null;currentFileMeta=null;updateFudoUi();renderDashboard();generateOrders()}};
 
