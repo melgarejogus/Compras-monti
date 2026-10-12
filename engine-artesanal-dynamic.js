@@ -105,7 +105,9 @@ E.artOrder=function(stock,now=new Date(),sales=[],modifiers=[]){
   if(d.piecesPerBox){
    const remainingPieces=Math.max(0,Math.floor(pre.projected*d.piecesPerBox+1e-7));
    const targetPlates=Math.ceil(demand*1.2*d.piecesPerBox/d.piecesPerPlate-1e-9);
-   qty=Math.max(0,Math.ceil((targetPlates*d.piecesPerPlate-remainingPieces)/d.piecesPerBox));
+   const minBoxes=Math.max(0,Math.ceil((targetPlates*d.piecesPerPlate-remainingPieces)/d.piecesPerBox));
+   const boxMultiple=d.piecesPerBox===96&&d.piecesPerPlate===36?3:d.piecesPerBox===24&&d.piecesPerPlate===16?2:1;
+   qty=Math.ceil(minBoxes/boxMultiple)*boxMultiple;
   }
   if(qty>0)lines.push({name:d.name,qty,unit:d.volcan?'cajas x12':d.kg?'kg':'cajas',forecast:demand,stock:st,
    note:'stock '+st.toFixed(2)+' · consumo hasta entrega '+pre.preConsumption.toFixed(2)+' · demanda cobertura '+demand.toFixed(2)+' · reserva 20% · pedido '+qty+(d.piecesPerBox?' · porciones completas tras compra '+Math.floor((Math.max(0,Math.floor(pre.projected*d.piecesPerBox+1e-7))+qty*d.piecesPerBox)/d.piecesPerPlate):'')});
