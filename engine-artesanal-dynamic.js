@@ -77,12 +77,13 @@ function forecasts(sales,modifiers=[],now=new Date()){
   // La promoción excepcional del 05/10/2026 cuenta al 50% solo en la demanda histórica.
   const promoDay= date.getFullYear()===2026&&date.getMonth()===9&&date.getDate()===5;
   const adjustedQty=sku==='Pan de volcán'&&promoDay?n(s.qty)*.5:n(s.qty);
+  if(s.orderId&&resolvedOrderSku.has(String(s.orderId)+'|'+norm(s.product)+'|'+sku))continue;
   // Cada volcán computado consume un pan y 250 g de ñoquis.
+  // Descontar una sola vez, después de descartar productos resueltos por modificadores.
   if(sku==='Pan de volcán'){
    const extraKey='Ñoquis|'+dateKey;
    days.set(extraKey,(days.get(extraKey)||0)+adjustedQty*.25);
   }
-  if(s.orderId&&resolvedOrderSku.has(String(s.orderId)+'|'+norm(s.product)+'|'+sku))continue;
   // Los platos genéricos requieren leer modificadores; no atribuirlos a un SKU por su nombre comercial.
   if(/pastas clasicas|pastas simples/i.test(norm(s.product)))continue;
   const key=sku+'|'+dateKey,qty=adjustedQty*(/2 platos de fusiles|2 fusilis para compartir/.test(label)?2:1);
