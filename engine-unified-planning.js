@@ -10,7 +10,7 @@
   };
   const artItems=[['Ñoquis','kg',5],['Fusiles','kg',5],['Macarrones','kg',5],['Spaghetti','kg',5],['Ravioles pollo y verdura','cajas',1],['Ravioles de ricota','cajas',1],['Raviolones de batata','cajas',1],['Pan de volcán','cajas x12',12]];
   E.artOrder=function(stock,now=new Date()){
-    const p=E.plans(now).art,snap=core.snapshotAt(now),cfg=core.provider('artesanal'),lines=[];
+    const p=E.plans(now).art,snap=new Date(now),cfg=core.provider('artesanal'),lines=[];
     artItems.forEach(([name,unit,round])=>{
       const proj=artProjection[norm(name)]||[],daily=d=>proj[d.getDay()]||0;
       const projected=core.projectedStock({currentStock:n(stock[name]),snapshot:snap,delivery:p.delivery,dailyDemand:daily,schedule:cfg});
@@ -66,7 +66,7 @@
   E.cdpOrder=function(data,stock,now=new Date(),special29=false){
     if(special29)return oldCdp(data,stock,now,true);
     const scheduleCheck=core.requireSchedule('cdp');if(!scheduleCheck.ok){const o=oldCdp(data,stock,now,false);o.warning=scheduleCheck.reason;return o}
-    const p=E.plans(now).cdp,snap=core.snapshotAt(now),avg=cdpAverages(data),projectedStock={...stock},preBySku={};
+    const p=E.plans(now).cdp,snap=new Date(now),avg=cdpAverages(data),projectedStock={...stock},preBySku={};
     Object.keys(stock||{}).forEach(sku=>{const arr=avg[sku]||Array(7).fill(0);const info=core.projectedStock({currentStock:n(stock[sku]),snapshot:snap,delivery:p.delivery,dailyDemand:d=>arr[d.getDay()]||0,schedule:scheduleCheck.provider});projectedStock[sku]=info.projected;preBySku[sku]=info.preConsumption});
     const result=oldCdp(data,projectedStock,now,false);
     (result.lines||[]).forEach(l=>{const pre=preBySku[l.name]||0;l.note=`${l.note||''} · motor único · stock ${fmt(snap)} · consumo hasta entrega ${pre.toFixed(2)} · stock proyectado ${n(projectedStock[l.name]).toFixed(2)}`});
@@ -76,7 +76,7 @@
   const oldBreaders=E.breadersOrder.bind(E);
   E.breadersOrder=function(data,stock,now=new Date()){
     const scheduleCheck=core.requireSchedule('breaders');if(!scheduleCheck.ok){const o=oldBreaders(data,stock,now);o.warning=scheduleCheck.reason;return o}
-    const p=E.plans(now).breaders,snap=core.snapshotAt(now);
+    const p=E.plans(now).breaders,snap=new Date(now);
     const rows=(data.modifiers||[]).filter(m=>m?.date&&!m.cancelled&&m.date.getDate()!==29&&norm(m.group)==='tipo de milanesa'&&norm(m.modifier).includes('pollo'));
     const avg=core.weekdayAverages(rows,r=>n(r.qty)/20);
     const current=n(stock['Milanesa pollo x 5kg']??stock['Milanesa pollo']);
