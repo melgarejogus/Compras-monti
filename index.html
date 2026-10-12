@@ -15,7 +15,7 @@
       <div class="brand"><span class="brand-mark">M</span><div><strong>Monti Compras</strong><small>Planificación y stock</small></div></div>
       <nav class="side-nav">
         <button class="nav-item active" data-view="dashboard">Inicio</button>
-        <button class="nav-item" data-view="fudo">Datos Fudo</button>
+        <button class="nav-item" data-view="fudo" data-admin-only>Datos Fudo</button>
         <button class="nav-item" data-view="stock">Stock</button>
         <button class="nav-item" data-view="orders">Pedidos</button>
         <button class="nav-item" data-view="recipes">Recetas</button>
@@ -29,13 +29,13 @@
       <header class="topbar">
         <button id="menuToggle" class="menu-toggle" aria-label="Abrir menú">☰</button>
         <div><p class="eyebrow">MONTI · COMPRAS</p><h1 id="pageTitle">Inicio</h1></div>
-        <div class="top-actions"><button id="firebaseLogout" class="secondary-btn" type="button" style="display:none">Salir</button><button id="quickUpload" class="secondary-btn">Actualizar Excel</button><span id="statusChip" class="chip">Sin datos</span></div>
+        <div class="top-actions"><button id="firebaseLogout" class="secondary-btn" type="button" style="display:none">Salir</button><button id="quickUpload" data-admin-only class="secondary-btn">Actualizar Excel</button><span id="statusChip" class="chip">Sin datos</span></div>
       </header>
 
       <main>
         <section class="view active" data-view-panel="dashboard">
           <div class="dashboard-hero card">
-            <div><p class="eyebrow">RESUMEN</p><h2>Qué necesita atención hoy</h2><p class="muted">El sistema usa el último Excel guardado y el stock cargado en este dispositivo.</p></div>
+            <div><p class="eyebrow">RESUMEN</p><h2>Qué necesita atención hoy</h2><p class="muted">El sistema usa las ventas compartidas en Firebase y el último stock guardado en la nube.</p></div>
             <button id="viewOrdersBtn" class="primary-btn">Ver próximos pedidos</button>
           </div>
           <div class="summary-grid four">
@@ -49,8 +49,8 @@
         </section>
 
         <section class="view" data-view-panel="fudo">
-          <div class="page-heading"><div><p class="eyebrow">DATOS FUDO</p><h2>Archivo de ventas</h2><p class="muted">El archivo original y los datos procesados quedan guardados localmente en este navegador.</p></div></div>
-          <section class="upload-card card">
+          <div class="page-heading"><div><p class="eyebrow">DATOS FUDO</p><h2>Archivo de ventas</h2><p class="muted">El administrador publica las ventas procesadas en Firebase. El Excel original queda como respaldo en su navegador.</p></div></div>
+          <p id="salesCloudStatus" class="muted" role="status">Esperando datos de Firebase…</p><section class="upload-card card">
             <div class="upload-copy"><span class="upload-icon">↥</span><div><h3 id="fudoFileName">Todavía no se cargó un Excel</h3><p id="fileMeta" class="muted">Elegí el Excel completo exportado desde Fudo.</p></div></div>
             <label class="primary-btn">Cargar / reemplazar Excel<input id="fileInput" type="file" accept=".xlsx,.xls" hidden /></label>
           </section>
@@ -60,7 +60,7 @@
             <article class="metric card"><span>Pollo válidas</span><strong id="chickenCount">0</strong></article>
             <article class="metric card"><span>Carne válidas</span><strong id="beefCount">0</strong></article>
           </div>
-          <section class="card"><div class="section-head"><div><p class="eyebrow">ARCHIVO GUARDADO</p><h2>Persistencia local</h2></div><button id="clearExcel" class="ghost-btn">Quitar archivo</button></div><div id="storageStatus" class="storage-box">Sin archivo guardado.</div></section>
+          <section class="card"><div class="section-head"><div><p class="eyebrow">ARCHIVO GUARDADO</p><h2>Datos compartidos</h2></div><button id="clearExcel" class="ghost-btn">Quitar copia local</button></div><div id="storageStatus" class="storage-box">Sin archivo guardado.</div></section>
         </section>
 
         <section class="view" data-view-panel="stock">
@@ -91,7 +91,7 @@
       </main>
     </div>
   </div>
-  <script type="module" src="firebase-monti.js?v=20261012-1300"></script>
-  <script src="engine.js?v=20261012-1132"></script><script src="engine-fix-v04.js?v=20261012-1132"></script><script src="app.js?v=20261012-1300"></script><script src="engine-stockdate-fix.js?v=20261012-1132"></script><script src="engine-cdp29-fix.js?v=20261012-1132"></script><script src="planning-core.js?v=20261012-1132"></script><script src="engine-unified-planning.js?v=20261012-1132"></script><script src="engine-day29-policy.js?v=20261012-1132"></script><script src="engine-portions-stock.js?v=20261012-1132"></script><script src="engine-cdp-turn-aware.js?v=20261012-1132"></script><script src="engine-artesanal-dynamic.js?v=20261012-1132"></script>
+  <script type="module" src="firebase-monti.js?v=20261012-1400"></script>
+  <script src="engine.js?v=20261012-1132"></script><script src="engine-fix-v04.js?v=20261012-1132"></script><script src="app.js?v=20261012-1400"></script><script src="engine-stockdate-fix.js?v=20261012-1132"></script><script src="engine-cdp29-fix.js?v=20261012-1132"></script><script src="planning-core.js?v=20261012-1132"></script><script src="engine-unified-planning.js?v=20261012-1132"></script><script src="engine-day29-policy.js?v=20261012-1132"></script><script src="engine-portions-stock.js?v=20261012-1132"></script><script src="engine-cdp-turn-aware.js?v=20261012-1132"></script><script src="engine-artesanal-dynamic.js?v=20261012-1132"></script>
 </body>
 </html>
