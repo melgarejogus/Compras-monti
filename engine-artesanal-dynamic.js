@@ -8,9 +8,9 @@ const defs=[
  {name:'Macarrones',base:'Macarrones',kg:true,portions:[['Macarrones porciones',.2]]},
  {name:'Spaghetti',base:'Spaghetti',kg:true,portions:[['Spaghetti porciones 200g',.2],['Spaghetti porciones 150g',.15]]},
  {name:'Rigatoni',base:'Rigatoni',kg:true,portions:[['Rigatoni porciones',.2]]},
- {name:'Ravioles pollo y verdura',base:'Ravioles pollo y verdura',portions:[['Ravioles pollo y verdura porciones',.375]]},
- {name:'Ravioles de ricota',base:'Ravioles de ricota',portions:[['Ravioles de ricota porciones',.375]]},
- {name:'Raviolones de batata',base:'Raviolones de batata',portions:[['Raviolones de batata porciones',2/3]]},
+ {name:'Ravioles pollo y verdura',base:'Ravioles pollo y verdura',piecesPerBox:96,piecesPerPlate:36,portions:[['Ravioles pollo y verdura porciones',.375]]},
+ {name:'Ravioles de ricota',base:'Ravioles de ricota',piecesPerBox:96,piecesPerPlate:36,portions:[['Ravioles de ricota porciones',.375]]},
+ {name:'Raviolones de batata',base:'Raviolones de batata',piecesPerBox:24,piecesPerPlate:16,portions:[['Raviolones de batata porciones',2/3]]},
  {name:'Pan de volcán',base:'Pan de volcán',volcan:true,portions:[]}
 ];
 const synonyms={
@@ -67,7 +67,7 @@ function forecasts(sales,modifiers=[]){
   if(!sku)continue;
   if(s.orderId&&resolvedOrderSku.has(String(s.orderId)+'|'+norm(s.product)+'|'+sku))continue;
   // Los platos genéricos requieren leer modificadores; no atribuirlos a un SKU por su nombre comercial.
-  if(/pastas clasicas|pastas clasicas|pastas simples|combo/i.test(norm(s.product)))continue;
+  if(/pastas clasicas|pastas simples/i.test(norm(s.product)))continue;
   const key=sku+'|'+dateKey,qty=n(s.qty)*(/2 platos de fusiles|2 fusilis para compartir/.test(label)?2:1);
   let factor=sku==='Pan de volcán'?1:sku==='Ñoquis'?.25:sku==='Fusiles'||sku==='Macarrones'||sku==='Spaghetti'||sku==='Rigatoni'?.2:sku==='Ravioles pollo y verdura'||sku==='Ravioles de ricota'?.375:2/3;
   if(/pastamila|pasta mila/.test(label))factor=.15;
@@ -101,9 +101,14 @@ E.artOrder=function(stock,now=new Date(),sales=[],modifiers=[]){
   if(d.name==='Rigatoni'&&p.coverage.length===4)demand=Math.max(demand,6);
   const need=Math.max(0,demand*1.2-pre.projected);
   const pack=d.volcan?12:d.kg?5:1;
-  const qty=d.volcan?Math.ceil(need/12):d.kg?Math.ceil(need/5)*5:Math.ceil(need);
+  let qty=d.volcan?Math.ceil(need/12):d.kg?Math.ceil(need/5)*5:Math.ceil(need);
+  if(d.piecesPerBox){
+   const remainingPieces=Math.max(0,Math.floor(pre.projected*d.piecesPerBox+1e-7));
+   const targetPlates=Math.ceil(demand*1.2*d.piecesPerBox/d.piecesPerPlate-1e-9);
+   qty=Math.max(0,Math.ceil((targetPlates*d.piecesPerPlate-remainingPieces)/d.piecesPerBox));
+  }
   if(qty>0)lines.push({name:d.name,qty,unit:d.volcan?'cajas x12':d.kg?'kg':'cajas',forecast:demand,stock:st,
-   note:'stock '+st.toFixed(2)+' · consumo hasta entrega '+pre.preConsumption.toFixed(2)+' · demanda cobertura '+demand.toFixed(2)+' · reserva 20% · pedido '+qty});
+   note:'stock '+st.toFixed(2)+' · consumo hasta entrega '+pre.preConsumption.toFixed(2)+' · demanda cobertura '+demand.toFixed(2)+' · reserva 20% · pedido '+qty+(d.piecesPerBox?' · porciones completas tras compra '+Math.floor((Math.max(0,Math.floor(pre.projected*d.piecesPerBox+1e-7))+qty*d.piecesPerBox)/d.piecesPerPlate):'')});
  }
  return {provider:'La Artesanal',plan:p,lines,stockSnapshotDate:snapshot,
  warning:(!sales?.length?'Sin ventas importadas para proyección. ':'')+'Pastamila 150 g tallarines; Combo Ravioles ricota; brasato excluido (CDP). Validar otros menús genéricos y porciones por caja.'};
