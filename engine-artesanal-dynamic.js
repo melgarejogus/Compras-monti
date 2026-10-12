@@ -93,7 +93,9 @@ function effectiveStock(stock,d){
  return n(stock[d.base])+(d.portions||[]).reduce((a,[key,eq])=>a+n(stock[key])*eq,0);
 }
 E.artOrder=function(stock,now=new Date(),sales=[],modifiers=[]){
- const p=E.plans(now).art,snapshot=core.snapshotAt(now),cfg=core.provider('artesanal');
+ const savedAt=localStorage.getItem('monti.web.stock.v3.savedAt');
+ const validSavedAt=savedAt&&!Number.isNaN(new Date(savedAt).getTime())&&new Date(savedAt)<=now;
+ const p=E.plans(now).art,snapshot=validSavedAt?new Date(savedAt):now,cfg=core.provider('artesanal');
  const avg=forecasts(sales,modifiers),lines=[];
  for(const d of defs){
   const st=effectiveStock(stock,d),daily=date=>avg[d.name][date.getDay()]||0;
@@ -115,6 +117,6 @@ E.artOrder=function(stock,now=new Date(),sales=[],modifiers=[]){
    note:'stock '+st.toFixed(2)+' · consumo hasta entrega '+pre.preConsumption.toFixed(2)+' · demanda cobertura '+demand.toFixed(2)+' · reserva 20% · pedido '+qty+(d.piecesPerBox?' · porciones completas tras compra '+Math.floor((Math.max(0,Math.floor(pre.projected*d.piecesPerBox+1e-7))+qty*d.piecesPerBox)/d.piecesPerPlate):'')});
  }
  return {provider:'La Artesanal',plan:p,lines,stockSnapshotDate:snapshot,
- warning:(!sales?.length?'Sin ventas importadas para proyección. ':'')+'Pastamila 150 g tallarines; Combo Ravioles ricota; brasato excluido (CDP). Validar otros menús genéricos y porciones por caja.'};
+ warning:(!validSavedAt?'Stock sin fecha válida: volver a guardar el inventario para calcular desde su fecha real. ':'')+(!sales?.length?'Sin ventas importadas para proyección. ':'')+'Pastamila 150 g tallarines; Combo Ravioles ricota; brasato excluido (CDP). Validar otros menús genéricos y porciones por caja.'};
 };
 })();
