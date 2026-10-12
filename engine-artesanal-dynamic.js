@@ -35,9 +35,9 @@ function forecasts(sales,modifiers=[],now=new Date()){
  const days=new Map(),seenDates=new Map();
  const end=new Date(now.getFullYear(),now.getMonth(),now.getDate());
  const start=new Date(end);start.setDate(start.getDate()-60);
- const eligibleDate=value=>{const d=new Date(value);if(Number.isNaN(d.getTime()))return false;const day=new Date(d.getFullYear(),d.getMonth(),d.getDate());return day>=start&&day<end&&day.getDate()!==29&&!(day.getFullYear()===2026&&day.getMonth()===9&&day.getDate()===5)};
+ const eligibleDate=value=>{const d=new Date(value);if(Number.isNaN(d.getTime()))return false;const day=new Date(d.getFullYear(),d.getMonth(),d.getDate());return day>=start&&day<end&&day.getDate()!==29};
  // El 05/10/2026 hubo liquidación extraordinaria 2x1 de volcanes del 29.
- // Excluir ese día del promedio para no distorsionar la demanda habitual.
+ // Para el promedio histórico, computar la mitad de las unidades de volcán de ese día.
  const parentOrders=new Map();
  // Denominador: todos los días con ventas de Adiciones, aun sin pastas.
  for(const s of sales||[]){if(s?.date&&!s.cancelled&&!s.modifier&&norm(s.source||'')==='adiciones'&&eligibleDate(s.date)){const d=new Date(s.date);seenDates.set([d.getFullYear(),d.getMonth()+1,d.getDate()].join('-'),d.getDay());}}
@@ -74,15 +74,18 @@ function forecasts(sales,modifiers=[],now=new Date()){
   if(/combo tallarines/.test(label))sku='Spaghetti';
   if(/2 platos de fusiles|2 fusilis para compartir/.test(label))sku='Fusiles';
   if(!sku)continue;
-  // Cada volcán vendido consume un pan y 250 g de ñoquis.
+  // La promoción excepcional del 05/10/2026 cuenta al 50% solo en la demanda histórica.
+  const promoDay= date.getFullYear()===2026&&date.getMonth()===9&&date.getDate()===5;
+  const adjustedQty=sku==='Pan de volcán'&&promoDay?n(s.qty)*.5:n(s.qty);
+  // Cada volcán computado consume un pan y 250 g de ñoquis.
   if(sku==='Pan de volcán'){
    const extraKey='Ñoquis|'+dateKey;
-   days.set(extraKey,(days.get(extraKey)||0)+n(s.qty)*.25);
+   days.set(extraKey,(days.get(extraKey)||0)+adjustedQty*.25);
   }
   if(s.orderId&&resolvedOrderSku.has(String(s.orderId)+'|'+norm(s.product)+'|'+sku))continue;
   // Los platos genéricos requieren leer modificadores; no atribuirlos a un SKU por su nombre comercial.
   if(/pastas clasicas|pastas simples/i.test(norm(s.product)))continue;
-  const key=sku+'|'+dateKey,qty=n(s.qty)*(/2 platos de fusiles|2 fusilis para compartir/.test(label)?2:1);
+  const key=sku+'|'+dateKey,qty=adjustedQty*(/2 platos de fusiles|2 fusilis para compartir/.test(label)?2:1);
   let factor=sku==='Pan de volcán'?1:sku==='Ñoquis'?.25:sku==='Fusiles'||sku==='Macarrones'||sku==='Spaghetti'||sku==='Rigatoni'?.2:sku==='Ravioles pollo y verdura'||sku==='Ravioles de ricota'?.375:2/3;
   if(/pastamila|pasta mila/.test(label))factor=.15;
   if(/1 kg tallarines/.test(label))factor=1;
