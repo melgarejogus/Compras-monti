@@ -44,7 +44,7 @@ window.MontiCloud={
   if(chunks.length>200)throw Error('El Excel procesado es demasiado grande para sincronizar.');
   const version=Date.now().toString(36)+'-'+auth.currentUser.uid.slice(0,6);
   for(let i=0;i<chunks.length;i+=200){const batch=writeBatch(db);chunks.slice(i,i+200).forEach((part,j)=>batch.set(doc(salesChunks,version+'_'+(i+j)),{part}));await batch.commit()}
-  await setDoc(salesManifest,{version,count:chunks.length,meta,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});
+  await setDoc(salesManifest,{version,count:chunks.length,meta:{...meta,sheets:(meta.sheets||[]).map(entry=>({name:String(entry[0]||''),rows:Number(entry[1]||0)}))},updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});
   return true;
  },
  async loadSales(){
