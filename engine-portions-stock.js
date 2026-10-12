@@ -24,23 +24,49 @@
   // No dependemos de poder mutar `stockItems` de app.js. Insertamos los campos
   // directamente en la grilla para que funcionen incluso si el navegador mantiene
   // una versión cacheada de app.js o cambia el alcance de variables entre scripts.
+  // Mostrar porciones junto al stock a granel, sin filas separadas.
   function addPreparedRows(){
     const grid=document.getElementById('stockGrid');
-    const provider=document.getElementById('stockProvider')?.value||'all';
-    const search=norm(document.getElementById('stockSearch')?.value||'');
-    if(!grid||!(provider==='all'||provider==='La Artesanal'))return;
+    if(!grid)return;
     const saved=readStock();
-    const existing=new Set([...grid.querySelectorAll('.stock-row strong')].map(x=>norm(x.textContent)));
-    const frag=document.createDocumentFragment();
-    prepared.forEach(p=>{
-      if(existing.has(norm(p.key)))return;
-      if(search&&!norm(p.key).includes(search)&&!norm(p.base).includes(search)&&!norm(p.label).includes(search))return;
-      const row=document.createElement('div');
-      row.className='stock-row prepared-stock-row';
-      row.innerHTML=`<strong>${p.key}</strong><span class="provider-cell">La Artesanal</span><span class="unit-cell">${p.label}</span><input data-prepared-key="${p.key}" type="number" min="0" step="1" inputmode="numeric" value="${saved[p.key]??''}" placeholder="0">`;
-      frag.appendChild(row);
-    });
-    if(frag.childNodes.length)grid.appendChild(frag);
+    const search=norm(document.getElementById('stockSearch')?.value||'');
+    const rows=[...grid.querySelectorAll('.stock-row')];
+    for(const row of rows){
+      const title=row.querySelector('strong')?.textContent||'';
+      const parts=prepared.filter(p=>norm(p.base)===norm(title));
+      if(!parts.length)continue;
+      if(search&&!norm(title).includes(search)&&!parts.some(p=>norm(p.key).includes(search)||norm(p.label).includes(search)))continue;
+      row.classList.add('stock-combined-row');
+      let wrap=row.querySelector('.stock-combined-inputs');
+      if(!wrap){
+        wrap=document.createElement('div');
+        wrap.className='stock-combined-inputs';
+        const baseInput=row.querySelector('input[data-stock]');
+        if(baseInput){
+          const baseField=document.createElement('label');
+          baseField.className='stock-combined-field';
+          const baseLabel=document.createElement('span');
+          baseLabel.textContent='Kg';
+          if(!['kg'].includes(norm(row.querySelector('.unit-cell')?.textContent||'')))baseLabel.textContent='Cajas';
+          baseField.append(baseLabel,baseInput);
+          wrap.appendChild(baseField);
+        }
+        row.appendChild(wrap);
+      }
+      for(const p of parts){
+        if([...wrap.querySelectorAll('[data-prepared-key]')].some(input=>input.dataset.preparedKey===p.key))continue;
+        const field=document.createElement('label');
+        field.className='stock-combined-field';
+        const label=document.createElement('span');
+        label.textContent=p.label;
+        const input=document.createElement('input');
+        input.dataset.preparedKey=p.key;
+        input.type='number';input.min='0';input.step='1';input.inputMode='numeric';
+        input.value=saved[p.key]??'';input.placeholder='0';
+        field.append(label,input);
+        wrap.appendChild(field);
+      }
+    }
   }
 
   let scheduled=false;
