@@ -16,26 +16,33 @@ let signedIn=false;
 const stockRef=doc(db,'monti','stock');
 const showError=(message)=>{error.textContent=message};
 const localStock=()=>{try{return JSON.parse(localStorage.getItem(stockKey)||'{}')}catch{return {}}};
+let cloudReady=false;
+const status=(message)=>{const el=document.getElementById('cloudSaveStatus');if(el)el.textContent=message};
 async function restoreCloudStock(){
+ cloudReady=false;
  const snapshot=await getDoc(stockRef);
- if(!snapshot.exists())return;
+ if(!snapshot.exists()){status('Firebase no tiene stock inicial. Guardá para crearlo.');cloudReady=true;return}
  const remote=snapshot.data();
- if(!remote?.items || typeof remote.items!=='object')return;
- const local=localStock();
- if(Object.keys(local).length===0){
-   localStorage.setItem(stockKey,JSON.stringify(remote.items));
-   if(remote.savedAt)localStorage.setItem(savedAtKey,remote.savedAt);
-   if(typeof window.renderStock==='function')window.renderStock();
-   if(typeof window.generateOrders==='function')window.generateOrders();
- }else if(JSON.stringify(local)!==JSON.stringify(remote.items)){
-   const status=document.getElementById('stockSavedAt');
-   if(status)status.textContent='Hay stock en la nube distinto del de este dispositivo. Guardá stock para subir el actual o consultá antes de reemplazarlo.';
- }
+ if(!remote?.items || typeof remote.items!=='object')throw Error('Datos de stock inválidos en Firebase');
+ localStorage.setItem(stockKey,JSON.stringify(remote.items));
+ if(remote.savedAt)localStorage.setItem(savedAtKey,remote.savedAt);
+ if(typeof window.renderStock==='function')window.renderStock();
+ if(typeof window.generateOrders==='function')window.generateOrders();
+ status('Stock cargado desde Firebase ✓');
+ cloudReady=true;
 }
 window.MontiCloud={
- async saveStock(){
-  if(!signedIn)throw Error('Iniciá sesión para guardar en la nube.');
-  const items=localStock();const savedAt=localStorage.getItem(savedAtKey)||new Date().toISOString();await setDoc(stockRef,{items,savedAt,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});const confirmed=await getDoc(stockRef);if(!confirmed.exists()||confirmed.data().savedAt!==savedAt)throw Error('Firebase no confirmó el guardado actual.');
+ async saveStock(items){
+  if(!signedIn||!cloudReady)throw Error('Firebase todavía no está listo. No se guardó.');
+  const savedAt=new Date().toISOString();
+  await setDoc(stockRef,{items,savedAt,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});
+  const confirmed=await getDoc(stockRef);
+  if(!confirmed.exists()||confirmed.data().savedAt!==savedAt)throw Error('Firebase no confirmó el guardado actual.');
+  localStorage.setItem(stockKey,JSON.stringify(items)); // Copia técnica para el motor de cálculos, no fuente oficial.
+  localStorage.setItem(savedAtKey,savedAt);
+  if(typeof window.renderStock==='function')window.renderStock();
+  if(typeof window.generateOrders==='function')window.generateOrders();
+  return true;
  }
 };
 onAuthStateChanged(auth,async user=>{
@@ -43,7 +50,7 @@ onAuthStateChanged(auth,async user=>{
  login.style.display=signedIn?'none':'flex';
  logout.style.display=signedIn?'':'none';
  if(user&&!signedIn){showError('Esta cuenta no tiene autorización para ingresar.');await signOut(auth);return;}
- if(signedIn){try{await restoreCloudStock()}catch(e){console.warn('No se pudo recuperar stock de la nube',e)}}
+ if(signedIn){try{await restoreCloudStock()}catch(e){cloudReady=false;status('ERROR: no se pudo leer Firebase. No guardes hasta recuperar conexión.');console.warn('No se pudo recuperar stock de la nube',e)}}
 });
 form.addEventListener('submit',async event=>{
  event.preventDefault();showError('Ingresando…');
