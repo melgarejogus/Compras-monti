@@ -29,7 +29,7 @@ async function dbDelete(key){const db=await openDb();return new Promise((resolve
 function serializeParsed(data){return {sales:data.sales.map(x=>({...x,date:x.date?.toISOString()||null})),modifiers:data.modifiers.map(x=>({...x,date:x.date?.toISOString()||null}))}}
 function reviveParsed(data){if(!data)return null;return {sales:(data.sales||[]).map(x=>({...x,date:x.date?new Date(x.date):null})),modifiers:(data.modifiers||[]).map(x=>({...x,date:x.date?new Date(x.date):null}))}}
 
-function navigate(view){document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.dataset.viewPanel===view));document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.view===view));const btn=document.querySelector(`.nav-item[data-view="${view}"]`);$('pageTitle').textContent=btn?.textContent||'Monti Compras';$('sidebar').classList.remove('open');window.scrollTo({top:0,behavior:'smooth'})}
+function navigate(view){if(view==='orders'&&parsedData)generateOrders();document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.dataset.viewPanel===view));document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.view===view));const btn=document.querySelector(`.nav-item[data-view="${view}"]`);$('pageTitle').textContent=btn?.textContent||'Monti Compras';$('sidebar').classList.remove('open');window.scrollTo({top:0,behavior:'smooth'})}
 document.querySelectorAll('.nav-item').forEach(btn=>btn.addEventListener('click',()=>navigate(btn.dataset.view)));
 $('menuToggle').addEventListener('click',()=>$('sidebar').classList.toggle('open'));
 $('viewOrdersBtn').addEventListener('click',()=>navigate('orders'));
@@ -73,3 +73,6 @@ document.querySelectorAll('[data-order-filter]').forEach(btn=>btn.addEventListen
 async function restoreCachedExcel(){try{currentFileMeta=await dbGet('fileMeta')||null;parsedData=reviveParsed(await dbGet('parsedData'));updateFudoUi();renderDashboard();generateOrders()}catch(err){console.warn('No se pudo restaurar cache local',err)}}
 
 renderStock();updateFudoUi();renderDashboard();restoreCachedExcel();
+// Al regresar a la aplicación, recalcular con el reloj actual del dispositivo.
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&parsedData)generateOrders()});
+window.addEventListener('focus',()=>{if(parsedData)generateOrders()});
