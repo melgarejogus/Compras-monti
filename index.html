@@ -9,7 +9,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js?v=20261012-1132"></script>
 </head>
 <body>
-  <div id="firebaseLogin" class="firebase-login" style="position:fixed;inset:0;z-index:9999;background:#0f1115;color:#f5f5f5;display:flex;align-items:center;justify-content:center;padding:20px"><form id="firebaseLoginForm" style="width:min(420px,100%);background:#1d222b;border:1px solid #343b49;border-radius:16px;padding:28px;display:grid;gap:14px"><h2 style="margin:0">Monti Compras</h2><p style="margin:0;color:#abb5c6">Ingresá con tu cuenta autorizada.</p><input id="firebaseEmail" type="email" autocomplete="username" placeholder="Correo electrónico" required style="padding:13px;border-radius:8px"><input id="firebasePassword" type="password" autocomplete="current-password" placeholder="Contraseña" required style="padding:13px;border-radius:8px"><button type="submit" class="primary-btn">Ingresar</button><button type="button" id="firebaseReset" class="secondary-btn">Recuperar contraseña</button><p id="firebaseLoginError" role="alert" style="margin:0;color:#ffb5b5"></p></form></div>
+  <div id="firebaseLogin" class="firebase-login" style="position:fixed;inset:0;z-index:9999;background:#0f1115;color:#f5f5f5;display:flex;align-items:center;justify-content:center;padding:20px"><form id="firebaseLoginForm" style="width:min(420px,100%);background:#1d222b;border:1px solid #343b49;border-radius:16px;padding:28px;display:grid;gap:14px"><h2 style="margin:0">Monti Compras</h2><p style="margin:0;color:#abb5c6">Ingresá con tu usuario y contraseña.</p><input id="firebaseEmail" type="text" autocomplete="username" placeholder="Usuario o correo de administrador" required style="padding:13px;border-radius:8px"><input id="firebasePassword" type="password" autocomplete="current-password" placeholder="Contraseña" required style="padding:13px;border-radius:8px"><button type="submit" class="primary-btn">Ingresar</button><button type="button" id="firebaseReset" class="secondary-btn">Recuperar contraseña de administrador</button><p id="firebaseLoginError" role="alert" style="margin:0;color:#ffb5b5"></p></form></div>
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
       <div class="brand"><span class="brand-mark">M</span><div><strong>Monti Compras</strong><small>Planificación y stock</small></div></div>
@@ -91,7 +91,7 @@
       </main>
     </div>
   </div>
-  <script type="module" src="firebase-monti-v2.js?v=20261012-1305"></script>
+  <script type="module" src="firebase-monti-v2.js?v=20261012-usuarios-1"></script>
   <script src="engine.js?v=20261012-1132"></script><script src="engine-fix-v04.js?v=20261012-1132"></script><script src="app.js?v=20261012-1257"></script><script src="engine-stockdate-fix.js?v=20261012-1132"></script><script src="engine-cdp29-fix.js?v=20261012-1132"></script><script src="planning-core.js?v=20261012-1132"></script><script src="engine-unified-planning.js?v=20261012-1132"></script><script src="engine-day29-policy.js?v=20261012-1132"></script><script src="engine-portions-stock.js?v=20261012-1132"></script><script src="engine-cdp-turn-aware.js?v=20261012-1132"></script><script src="engine-artesanal-dynamic.js?v=20261012-1132"></script>
 </body>
 </html>
