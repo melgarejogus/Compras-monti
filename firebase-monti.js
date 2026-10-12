@@ -35,7 +35,7 @@ async function restoreCloudStock(){
 window.MontiCloud={
  async saveStock(){
   if(!signedIn)throw Error('Iniciá sesión para guardar en la nube.');
-  await setDoc(stockRef,{items:localStock(),savedAt:localStorage.getItem(savedAtKey)||new Date().toISOString(),updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});
+  const items=localStock();const savedAt=localStorage.getItem(savedAtKey)||new Date().toISOString();await setDoc(stockRef,{items,savedAt,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});const confirmed=await getDoc(stockRef);if(!confirmed.exists()||confirmed.data().savedAt!==savedAt)throw Error('Firebase no confirmó el guardado actual.');
  }
 };
 onAuthStateChanged(auth,async user=>{
