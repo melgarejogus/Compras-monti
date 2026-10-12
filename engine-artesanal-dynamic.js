@@ -67,6 +67,11 @@ function forecasts(sales,modifiers=[]){
   if(/combo tallarines/.test(label))sku='Spaghetti';
   if(/2 platos de fusiles|2 fusilis para compartir/.test(label))sku='Fusiles';
   if(!sku)continue;
+  // Cada volcán vendido consume un pan y 250 g de ñoquis.
+  if(sku==='Pan de volcán'){
+   const extraKey='Ñoquis|'+dateKey;
+   days.set(extraKey,(days.get(extraKey)||0)+n(s.qty)*.25);
+  }
   if(s.orderId&&resolvedOrderSku.has(String(s.orderId)+'|'+norm(s.product)+'|'+sku))continue;
   // Los platos genéricos requieren leer modificadores; no atribuirlos a un SKU por su nombre comercial.
   if(/pastas clasicas|pastas simples/i.test(norm(s.product)))continue;
@@ -116,6 +121,6 @@ E.artOrder=function(stock,now=new Date(),sales=[],modifiers=[]){
    note:'stock '+st.toFixed(2)+' · consumo hasta entrega '+pre.preConsumption.toFixed(2)+' · demanda cobertura '+demand.toFixed(2)+' · reserva 20% · pedido '+qty+(d.piecesPerBox?' · porciones completas tras compra '+Math.floor((Math.max(0,Math.floor(pre.projected*d.piecesPerBox+1e-7))+qty*d.piecesPerBox)/d.piecesPerPlate):'')});
  }
  return {provider:'La Artesanal',plan:p,lines,stockSnapshotDate:snapshot,
- warning:(!sales?.length?'Sin ventas importadas para proyección. ':'')+'Pastamila 150 g tallarines; Combo Ravioles ricota; brasato excluido (CDP). Validar otros menús genéricos y porciones por caja.'};
+ warning:(!sales?.length?'Sin ventas importadas para proyección. ':'')+'Cada volcán consume 1 pan y 250 g de ñoquis. Pastamila 150 g tallarines; Combo Ravioles ricota; brasato excluido (CDP). Validar otros menús genéricos y porciones por caja.'};
 };
 })();
