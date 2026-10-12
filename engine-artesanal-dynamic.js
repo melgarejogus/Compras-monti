@@ -31,8 +31,23 @@ function classify(product){
  for(const d of defs.slice(0,-1))if(synonyms[d.name].test(k))return d.name;
  return null;
 }
-function forecasts(sales){
+function forecasts(sales,modifiers=[]){
  const days=new Map(),seenDates=new Map();
+ const parentOrders=new Map();
+ for(const p of sales||[]){if(p?.orderId&&!p.cancelled&&!p.modifier){const id=String(p.orderId);if(!parentOrders.has(id))parentOrders.set(id,[]);parentOrders.get(id).push(p)}}
+ const resolved=new Set();
+ for(const m of modifiers||[]){
+  if(m.cancelled||!m.date||!m.orderId)continue;
+  const sku=classify(m.modifier);if(!sku)continue;
+  const parents=parentOrders.get(String(m.orderId))||[];
+  const eligible=parents.filter(p=>/pastas clasicas|pastas clásicas|combo|elegi|elegí|menu|menú/i.test(norm(p.product)));
+  if(!eligible.length)continue;
+  const date=new Date(m.date),dateKey=[date.getFullYear(),date.getMonth()+1,date.getDate()].join('-');
+  const factor=sku==='Pan de volcán'?1:sku==='Ñoquis'?.25:sku==='Fusiles'||sku==='Macarrones'||sku==='Spaghetti'||sku==='Rigatoni'?.2:sku==='Ravioles pollo y verdura'||sku==='Ravioles de ricota'?.375:2/3;
+  const key=sku+'|'+dateKey, unique=String(m.orderId)+'|'+sku+'|'+norm(m.modifier);
+  if(resolved.has(unique))continue;
+  resolved.add(unique);days.set(key,(days.get(key)||0)+n(m.qty)*factor);seenDates.set(dateKey,date.getDay());
+ }
  for(const s of sales||[]){
   if(!s?.date||s.cancelled||s.modifier||s.date.getDate()===29)continue;
   const date=new Date(s.date),dateKey=[date.getFullYear(),date.getMonth()+1,date.getDate()].join('-');
@@ -40,6 +55,7 @@ function forecasts(sales){
   if(source==='adiciones')continue;
   const sku=classify(s.product);
   if(!sku)continue;
+  if(s.orderId&&resolved.size&&[...resolved].some(k=>k.startsWith(String(s.orderId)+'|'+sku+'|')))continue;
   // Los platos genéricos requieren leer modificadores; no atribuirlos a un SKU por su nombre comercial.
   if(/pastas clasicas|pastas clasicas|pastas simples|combo/i.test(norm(s.product)))continue;
   const key=sku+'|'+dateKey,qty=n(s.qty);
@@ -60,9 +76,9 @@ function forecasts(sales){
 function effectiveStock(stock,d){
  return n(stock[d.base])+(d.portions||[]).reduce((a,[key,eq])=>a+n(stock[key])*eq,0);
 }
-E.artOrder=function(stock,now=new Date(),sales=[]){
+E.artOrder=function(stock,now=new Date(),sales=[],modifiers=[]){
  const p=E.plans(now).art,snapshot=core.snapshotAt(now),cfg=core.provider('artesanal');
- const avg=forecasts(sales),lines=[];
+ const avg=forecasts(sales,modifiers),lines=[];
  for(const d of defs){
   const st=effectiveStock(stock,d),daily=date=>avg[d.name][date.getDay()]||0;
   const pre=core.projectedStock({currentStock:st,snapshot,delivery:p.delivery,dailyDemand:daily,schedule:cfg});
@@ -76,6 +92,6 @@ E.artOrder=function(stock,now=new Date(),sales=[]){
    note:'stock '+st.toFixed(2)+' · consumo hasta entrega '+pre.preConsumption.toFixed(2)+' · demanda cobertura '+demand.toFixed(2)+' · reserva 20% · pedido '+qty});
  }
  return {provider:'La Artesanal',plan:p,lines,stockSnapshotDate:snapshot,
- warning:(!sales?.length?'Sin ventas importadas para proyección. ':'')+'PROVISIONAL: falta integrar modificadores de tipo de pasta y auditar combos; no usar como pedido definitivo.'};
+ warning:(!sales?.length?'Sin ventas importadas para proyección. ':'')+'Los modificadores de combos se imputan por Id. Venta; revisar productos sin asociación y feriados extraordinarios.'};
 };
 })();
