@@ -38,7 +38,8 @@ function forecasts(sales,modifiers=[]){
  const resolved=new Set(),resolvedOrderSku=new Set();
  for(const m of modifiers||[]){
   if(m.cancelled||!m.date||!m.orderId)continue;
-  const sku=classify(m.modifier);if(!sku)continue;
+  if(norm(m.group)!=='tipo de pastas')continue;
+  const sku=classify(m.modifier);if(!sku||sku==='Pan de volcán')continue;
   const parents=parentOrders.get(String(m.orderId))||[];
   const eligible=parents.filter(p=>norm(p.product)===norm(m.product)&&/pastas clasicas|combo|elegi|menu/i.test(norm(p.product)));
   if(!eligible.length)continue;
@@ -53,13 +54,26 @@ function forecasts(sales,modifiers=[]){
   const date=new Date(s.date),dateKey=[date.getFullYear(),date.getMonth()+1,date.getDate()].join('-');
   const source=norm(s.source||'');
   if(source==='adiciones')continue;
-  const sku=classify(s.product);
+  let sku=classify(s.product);
+  const label=norm(s.product);
+  // Recetas conocidas: un plato de pasta por cada unidad del producto, salvo promos de dos platos.
+  if(/pastamila|pasta mila/.test(label))sku='Spaghetti';
+  if(/combo ravioles/.test(label))sku='Ravioles de ricota';
+  if(/grand raviolo/.test(label))sku='Ravioles de ricota';
+  if(/miercoles- mila \+ spag/.test(label))sku='Spaghetti';
+  if(/viernes- ravioles/.test(label))sku='Ravioles de ricota';
+  if(/mac & mila|mac and cheese|mac & cheese|mac monti|mac campeones|mac burguer/.test(label))sku='Macarrones';
+  if(/combo tallarines/.test(label))sku='Spaghetti';
+  if(/2 platos de fusiles|2 fusilis para compartir/.test(label))sku='Fusiles';
   if(!sku)continue;
   if(s.orderId&&resolvedOrderSku.has(String(s.orderId)+'|'+norm(s.product)+'|'+sku))continue;
   // Los platos genéricos requieren leer modificadores; no atribuirlos a un SKU por su nombre comercial.
   if(/pastas clasicas|pastas clasicas|pastas simples|combo/i.test(norm(s.product)))continue;
-  const key=sku+'|'+dateKey,qty=n(s.qty);
-  const factor=sku==='Pan de volcán'?1:sku==='Ñoquis'?.25:sku==='Fusiles'||sku==='Macarrones'||sku==='Spaghetti'||sku==='Rigatoni'?.2:sku==='Ravioles pollo y verdura'||sku==='Ravioles de ricota'?.375:2/3;
+  const key=sku+'|'+dateKey,qty=n(s.qty)*(/2 platos de fusiles|2 fusilis para compartir/.test(label)?2:1);
+  let factor=sku==='Pan de volcán'?1:sku==='Ñoquis'?.25:sku==='Fusiles'||sku==='Macarrones'||sku==='Spaghetti'||sku==='Rigatoni'?.2:sku==='Ravioles pollo y verdura'||sku==='Ravioles de ricota'?.375:2/3;
+  if(/1 kg tallarines/.test(label))factor=1;
+  if(/1\/2 kl de tallarines/.test(label)||/fusillis 500 gr/.test(label))factor=.5;
+  if(/1\/4 kg tallarines|1\/4 kl de fusiles/.test(label))factor=.25;
   days.set(key,(days.get(key)||0)+qty*factor);
   seenDates.set(dateKey,date.getDay());
  }
