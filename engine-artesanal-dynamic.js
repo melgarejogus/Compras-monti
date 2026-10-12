@@ -57,6 +57,9 @@ function forecasts(sales,modifiers=[]){
   let sku=classify(s.product);
   const label=norm(s.product);
   // Recetas conocidas: un plato de pasta por cada unidad del producto, salvo promos de dos platos.
+  if(/pastamila|pasta mila/.test(label))sku='Spaghetti';
+  if(/combo ravioles/.test(label))sku='Ravioles de ricota';
+  if(/grand brasato|brasato raviolo/.test(label))continue;
   if(/miercoles- mila \+ spag/.test(label))sku='Spaghetti';
   if(/mac & mila|mac and cheese|mac & cheese|mac monti|mac campeones|mac burguer/.test(label))sku='Macarrones';
   if(/combo tallarines/.test(label))sku='Spaghetti';
@@ -67,6 +70,7 @@ function forecasts(sales,modifiers=[]){
   if(/pastas clasicas|pastas clasicas|pastas simples|combo/i.test(norm(s.product)))continue;
   const key=sku+'|'+dateKey,qty=n(s.qty)*(/2 platos de fusiles|2 fusilis para compartir/.test(label)?2:1);
   let factor=sku==='Pan de volcán'?1:sku==='Ñoquis'?.25:sku==='Fusiles'||sku==='Macarrones'||sku==='Spaghetti'||sku==='Rigatoni'?.2:sku==='Ravioles pollo y verdura'||sku==='Ravioles de ricota'?.375:2/3;
+  if(/pastamila|pasta mila/.test(label))factor=.15;
   if(/1 kg tallarines/.test(label))factor=1;
   if(/1\/2 kl de tallarines/.test(label)||/fusillis 500 gr/.test(label))factor=.5;
   if(/1\/4 kg tallarines|1\/4 kl de fusiles/.test(label))factor=.25;
@@ -102,6 +106,6 @@ E.artOrder=function(stock,now=new Date(),sales=[],modifiers=[]){
    note:'stock '+st.toFixed(2)+' · consumo hasta entrega '+pre.preConsumption.toFixed(2)+' · demanda cobertura '+demand.toFixed(2)+' · reserva 20% · pedido '+qty});
  }
  return {provider:'La Artesanal',plan:p,lines,stockSnapshotDate:snapshot,
- warning:(!sales?.length?'Sin ventas importadas para proyección. ':'')+'Validación pendiente de recetas ambiguas: Pastamila, Combo Ravioles, Grand Raviolo y viernes ravioles; no asumir relleno o tipo de pasta.'};
+ warning:(!sales?.length?'Sin ventas importadas para proyección. ':'')+'Pastamila 150 g tallarines; Combo Ravioles ricota; brasato excluido (CDP). Validar otros menús genéricos y porciones por caja.'};
 };
 })();
