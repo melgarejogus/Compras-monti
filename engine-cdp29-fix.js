@@ -141,8 +141,21 @@
 
     // La opción de carne puede figurar como modificador; platos explícitos
     // sin selección de tipo se revisan aparte para no imputar pollo como vacuna.
-    const beef=forecastMilaNormal(data,p.coverage,'carne');
-    if(beef>0)addDirect(directNormal,'Milanesa vacuna x 3kg',beef/12,'12 milanesas por paquete · tipo carne confirmado en modificadores');
+    // Los modificadores «Tipo de milanesa» se cuentan por su producto padre
+    // y solamente cuando no está identificado ya en el nombre del plato.
+    const validMila=(data.modifiers||[]).filter(m=>!m.cancelled&&m.date&&m.date>=HISTORY_FROM&&m.date.getDate()!==29&&norm(m.group)==='tipo de milanesa');
+    const beefMods=validMila.filter(m=>norm(m.modifier).includes('carne')&&!norm(m.product).includes('carne'));
+    const beefByModifier=historicalWeekdayForecastNormal(beefMods.map(m=>({product:'vacuna_confirmada',date:m.date,qty:m.qty,cancelled:false})),p.coverage).vacuna_confirmada||0;
+    // Las focaccias de carne llevan la especie en el nombre y no requieren modificador.
+    const beefNamed=Object.entries(forecast).filter(([name])=>{const k=norm(name);return k.includes('mila')&&k.includes('carne')&&!k.includes('pollo')}).reduce((sum,[,qty])=>sum+qty,0);
+    const beef=beefByModifier+beefNamed;
+    if(beef>0)addDirect(directNormal,'Milanesa vacuna x 3kg',beef/12,'12 milanesas por paquete · carne confirmada por nombre o modificador, sin duplicar');
+    // No asignar a vacuna Pastamila / Mac & Mila sin elección registrada.
+    // El conteo de pollo es informativo; no entra en el SKU de vacuna.
+    const chickenMods=validMila.filter(m=>norm(m.modifier).includes('pollo'));
+    const chickenNamed=Object.entries(forecast).filter(([name])=>{const k=norm(name);return k.includes('mila')&&k.includes('pollo')}).reduce((sum,[,qty])=>sum+qty,0);
+    const chickenByModifier=historicalWeekdayForecastNormal(chickenMods.map(m=>({product:'pollo_confirmado',date:m.date,qty:m.qty,cancelled:false})),p.coverage).pollo_confirmado||0;
+    const milaAudit={beefByModifier,beefNamed,chickenByModifier,chickenNamed,unclassified:'Las ventas sin elección de tipo permanecen sin asignar'};
     const normalFocacciaPlates=Object.entries(forecast).filter(([k])=>isFocacciaPlate(k)).reduce((a,[,q])=>a+q,0);
     // Excluir el encabezado genérico «Viernes- Focacci» cuando ya existen
     // sándwiches individuales en Fudo: no son dos ventas independientes.
@@ -190,7 +203,7 @@
       'Día 29 corresponde a este ciclo, pero no encontré días 29 históricos utilizables desde julio 2026 en el Excel.'):
       'Los días 29 están excluidos de los promedios normales. Histórico normal desde julio 2026.';
 
-    return {provider:'Centro de Producción',plan:p,lines,warning,day29Stats:{applied:apply29,dates:mix.dates,avgSauceGrams:mix.avgSauceGrams,avgFocacciaPlates:mix.avgFocacciaPlates,avgGnocchiPortions:mix.avgGnocchiPortions,coverageRatio:mix.coverageRatio,details:mix.details}};
+    return {provider:'Centro de Producción',plan:p,lines,warning,day29Stats:{applied:apply29,dates:mix.dates,avgSauceGrams:mix.avgSauceGrams,avgFocacciaPlates:mix.avgFocacciaPlates,avgGnocchiPortions:mix.avgGnocchiPortions,coverageRatio:mix.coverageRatio,details:mix.details},milaAudit};
   };
 
   if(typeof window.generateOrders==='function')window.generateOrders();
