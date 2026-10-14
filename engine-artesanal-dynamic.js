@@ -7,7 +7,6 @@ const defs=[
  {name:'Fusiles',base:'Fusiles',kg:true,portions:[['Fusiles porciones',.2]]},
  {name:'Macarrones',base:'Macarrones',kg:true,portions:[['Macarrones porciones',.2]]},
  {name:'Spaghetti',base:'Spaghetti',kg:true,portions:[['Spaghetti porciones 200g',.2],['Spaghetti porciones 150g',.15]]},
- {name:'Rigatoni',base:'Rigatoni',kg:true,portions:[['Rigatoni porciones',.2]]},
  {name:'Ravioles pollo y verdura',base:'Ravioles pollo y verdura',piecesPerBox:96,piecesPerPlate:36,portions:[['Ravioles pollo y verdura porciones',.375]]},
  {name:'Ravioles de ricota',base:'Ravioles de ricota',piecesPerBox:96,piecesPerPlate:36,portions:[['Ravioles de ricota porciones',.375]]},
  {name:'Raviolones de batata',base:'Raviolones de batata',piecesPerBox:24,piecesPerPlate:16,portions:[['Raviolones de batata porciones',2/3]]},
@@ -116,8 +115,6 @@ E.artOrder=function(stock,now=new Date(),sales=[],modifiers=[]){
   const st=effectiveStock(stock,d),daily=date=>avg[d.name][date.getDay()]||0;
   const pre=core.projectedStock({currentStock:st,snapshot,delivery:p.delivery,dailyDemand:daily,schedule:cfg});
   let demand=p.coverage.reduce((a,date)=>a+daily(date),0);
-  // Menú ejecutivo: 30 platos de rigatoni de 200 g para el ciclo martes-viernes.
-  if(d.name==='Rigatoni'&&p.coverage.length===4)demand=Math.max(demand,6);
   const need=Math.max(0,demand*1.2-pre.projected);
   const pack=d.volcan?12:d.kg?5:1;
   // Para pasta a granel, solo subir al siguiente bloque de 5 kg si el exceso supera 20% de un bloque (1 kg).
