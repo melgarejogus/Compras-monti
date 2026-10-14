@@ -97,6 +97,68 @@
     return {bySku,dates:histDates,remainingRatio,mode:perDate.some(x=>x.timed)?'hora histórica':'fracción de jornada'};
   }
 
+  // Salsas elegidas en modificadores de adiciones genéricas.
+  // Se cuenta solamente cuando la adición madre NO contabiliza ya esa salsa.
+  // Los Id. Adición permiten deduplicar y evitar atribuir una salsa a otro plato.
+  const sauceType=s=>{
+    const k=norm(s);
+    if(k.includes('rosa'))return 'rosa';
+    if(k.includes('bolog'))return 'bolognesa';
+    if(k.includes('tuco'))return 'tuco';
+    if(k.includes('blanca')||k.includes('crema'))return 'blanca';
+    if(k.includes('pesto'))return 'pesto';
+    if(k.includes('cheddar'))return 'cheddar';
+    if(k.includes('mix')&&k.includes('ques'))return 'mix quesos';
+    return null;
+  };
+  function extraSauceDemand(data,coverage){
+    const parents=new Map();
+    for(const s of data.sales||[]){
+      if(s.cancelled||s.modifier||norm(s.source)!=='adiciones'||!s.additionId)continue;
+      parents.set(String(s.additionId),s);
+    }
+    const days=new Map(),dedup=new Set();
+    for(const s of data.sales||[]){
+      if(!s.date||s.cancelled||s.modifier||norm(s.source)==='adiciones'||s.date<HISTORY_FROM||s.date.getDate()===29)continue;
+      const d=s.date.toLocaleDateString('en-CA');
+      days.set(d,s.date.getDay());
+    }
+    const perDate=new Map();
+    for(const m of data.modifiers||[]){
+      if(m.cancelled||!m.date||m.date<HISTORY_FROM||m.date.getDate()===29)continue;
+      const type=sauceType(m.modifier);
+      if(!type||!m.additionId)continue;
+      const parent=parents.get(String(m.additionId));
+      if(!parent||sauceType(parent.product))continue;
+      const group=norm(m.group);
+      if(!group.includes('salsa')&&!group.includes('sabor'))continue;
+      const key=[m.orderId,m.additionId,m.modifier].join('|');
+      if(dedup.has(key))continue;
+      dedup.add(key);
+      const date=m.date.toLocaleDateString('en-CA');
+      if(!perDate.has(date))perDate.set(date,{wd:m.date.getDay(),qty:{}});
+      const q=perDate.get(date).qty;
+      q[type]=(q[type]||0)+n(m.qty);
+    }
+    const grams={tuco:220,bolognesa:250,blanca:220,pesto:150,cheddar:150,'mix quesos':220};
+    const result={};
+    for(const type of Object.keys(grams).concat('rosa')){
+      let portions=0;
+      for(const target of coverage){
+        const wd=target.getDay();
+        const all=[...days].filter(([,w])=>w===wd);
+        if(!all.length)continue;
+        portions+=all.reduce((sum,[date])=>sum+(perDate.get(date)?.qty[type]||0),0)/all.length;
+      }
+      if(!portions)continue;
+      const comps=type==='rosa'?[['tuco',110],['blanca',110]]:[[type,grams[type]]];
+      for(const [sku,g] of comps){
+        const def=sauceSku[sku];if(!def)continue;
+        result[def[0]]=(result[def[0]]||0)+portions*g/def[1];
+      }
+    }
+    return result;
+  }
   const baseCdp=E.cdpOrder.bind(E);
   E.cdpOrder=function(data,stock,now=new Date(),special29=false){
     if(special29)return baseCdp(data,stock,now,true);
@@ -123,6 +185,36 @@
     const pct=(special.remainingRatio*100).toFixed(0);
     result.warning=`${result.warning||''} Stock tomado el 29 a las ${snap.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}: antes de la entrega se descuenta el consumo especial restante del 29 (${pct}% promedio pendiente según ${special.mode}) y luego el consumo del 30 hasta la llegada del CDP. La entrega del 30 cubre sólo 1/10 y 2/10; el 29 no se vuelve a sumar como cobertura.`.trim();
     result.turnAware29={snapshot:snap,remainingRatio:special.remainingRatio,mode:special.mode,dates:special.dates,adjustments};
+    return result;
+  };
+  // Corrección independiente de CDP, sin modificar el motor de La Artesanal.
+  const previousCdp=E.cdpOrder.bind(E);
+  E.cdpOrder=function(data,stock,now=new Date(),special29=false){
+    const result=previousCdp(data,stock,now,special29);
+    if(special29||!data?.sales?.length)return result;
+    const coverage=result.plan?.coverage||[];
+    const extra=extraSauceDemand(data,coverage);
+    if(!Object.keys(extra).length)return result;
+    const safety=1.20;
+    for(const [sku,extraBags] of Object.entries(extra)){
+      const existing=result.lines.find(l=>l.name===sku);
+      // Stock proyectado debe ser el usado por el motor anterior.
+      const baseDemand=existing?.forecast||0;
+      const projectedStock=existing?existing.stock:Number(stock[sku]||0);
+      // Si el motor anterior no pidió este insumo, su demanda histórica puede
+      // ser distinta de cero: evitar inventar una compra sin conocer la base.
+      // Informar el faltante adicional y la necesidad de recalcular.
+      if(existing){
+        const total=Math.max(0,Math.ceil(baseDemand+extraBags*safety-projectedStock));
+        existing.qty=total;
+        existing.note=(existing.note||'')+' · modificadores vinculados: +'+extraBags.toFixed(2)+' bolsas (antes de reserva)';
+      }else{
+        result.sauceAudit??={};
+        result.sauceAudit[sku]={extraBags,warning:'Consumo adicional detectado; no se suma a compra sin conciliar la demanda base'};
+      }
+    }
+    result.lines=result.lines.filter(l=>l.qty>0);
+    result.warning=(result.warning||'')+' · Auditoría CDP: modificadores de salsa vinculados por Id. Adición; no se duplican salsas ya declaradas en adiciones.';
     return result;
   };
 })();
