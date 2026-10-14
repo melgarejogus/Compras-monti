@@ -136,12 +136,17 @@
       else if(k.includes('pastamila')||k.includes('mila napo'))addGram(normalNeeds,'tuco',150*q);
       if(k.includes('brasato'))addDirect(directNormal,'GRAND BRASATO X 2',q/2,'2 porciones por unidad');
       if(k.includes('empanad'))addDirect(directNormal,'Empanadas x 6',(k.includes('x6')||k.includes('x 6'))?q:q/6,'pack x6');
-      if(k.includes('meatball')||k.includes('meat ball')||k.includes('albondig'))addDirect(directNormal,'Meat Ball x 5 porciones',q/5,'5 porciones por unidad');
+      if((k.includes('meatball')||k.includes('meat ball')||k.includes('albondig'))&&!k.includes('bucket'))addDirect(directNormal,'Meat Ball x 5 porciones',q/5,'5 porciones por unidad; buckets excluidos hasta confirmar equivalencia');
     });
 
-    const beef=forecastMilaNormal(data,p.coverage,'carne');if(beef>0)addDirect(directNormal,'Milanesa vacuna x 3kg',beef/12,'12 milanesas x paquete');
+    // La opción de carne puede figurar como modificador; platos explícitos
+    // sin selección de tipo se revisan aparte para no imputar pollo como vacuna.
+    const beef=forecastMilaNormal(data,p.coverage,'carne');
+    if(beef>0)addDirect(directNormal,'Milanesa vacuna x 3kg',beef/12,'12 milanesas por paquete · tipo carne confirmado en modificadores');
     const normalFocacciaPlates=Object.entries(forecast).filter(([k])=>isFocacciaPlate(k)).reduce((a,[,q])=>a+q,0);
-    const focacciSand=Object.entries(forecast).filter(([k])=>/focacci/.test(norm(k))).reduce((a,[,q])=>a+q,0);
+    // Excluir el encabezado genérico «Viernes- Focacci» cuando ya existen
+    // sándwiches individuales en Fudo: no son dos ventas independientes.
+    const focacciSand=Object.entries(forecast).filter(([k])=>/focacci/.test(norm(k))&&!/^viernes[ -]*focacci/.test(norm(k))).reduce((a,[,q])=>a+q,0);
     addDirect(directNormal,'FOCACCIA X UNID',normalFocacciaPlates/28+focacciSand/8,'28 panes acompañamiento / 8 focacci sandwich');
 
     const day29=window.MontiEngine.plans(now).day29.delivery;
