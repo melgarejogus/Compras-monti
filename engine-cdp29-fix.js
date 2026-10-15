@@ -144,6 +144,14 @@
     // Los modificadores «Tipo de milanesa» se cuentan por su producto padre
     // y solamente cuando no está identificado ya en el nombre del plato.
     const validMila=(data.modifiers||[]).filter(m=>!m.cancelled&&m.date&&m.date>=HISTORY_FROM&&m.date.getDate()!==29&&norm(m.group)==='tipo de milanesa');
+    // Rigatoni: CDP entrega bolsas de 1 kg. Cada plato utiliza 200 g.
+    // Las ventas explícitas se toman de Adiciones; los menús genéricos
+    // se resuelven por el modificador «Tipo de pastas» sin duplicar platos.
+    const rigatoniExplicit=(data.sales||[]).filter(s=>!s.cancelled&&!s.modifier&&norm(s.source)==='adiciones'&&/rigaton|rigatin/.test(norm(s.product)));
+    const rigatoniGeneric=(data.modifiers||[]).filter(m=>!m.cancelled&&norm(m.group)==='tipo de pastas'&&/rigaton|rigatin/.test(norm(m.modifier))&&!/rigaton|rigatin/.test(norm(m.product)));
+    const rigatoniRows=[...rigatoniExplicit,...rigatoniGeneric].map(s=>({product:'rigatoni_cdp',date:s.date,qty:s.qty,cancelled:false}));
+    const rigatoniPlates=historicalWeekdayForecastNormal(rigatoniRows,p.coverage).rigatoni_cdp||0;
+    if(rigatoniPlates>0)addDirect(directNormal,'Rigatoni',rigatoniPlates*.2,'CDP bolsa x 1 kg · 200 g por plato · reserva 20%');
     const beefMods=validMila.filter(m=>norm(m.modifier).includes('carne')&&!norm(m.product).includes('carne'));
     const beefByModifier=historicalWeekdayForecastNormal(beefMods.map(m=>({product:'vacuna_confirmada',date:m.date,qty:m.qty,cancelled:false})),p.coverage).vacuna_confirmada||0;
     // Las focaccias de carne llevan la especie en el nombre y no requieren modificador.
