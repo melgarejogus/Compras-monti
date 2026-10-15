@@ -139,6 +139,20 @@
       if((k.includes('meatball')||k.includes('meat ball')||k.includes('albondig'))&&!k.includes('bucket'))addDirect(directNormal,'Meat Ball x 5 porciones',q/5,'5 porciones por unidad; buckets excluidos hasta confirmar equivalencia');
     });
 
+    // Insumos por receta confirmados. Confitados: bolsa de 500 g.
+    // Los otros dos insumos se expresan en kg hasta confirmar el envase.
+    const recipePlates=(predicate)=>Object.entries(forecast)
+      .filter(([name])=>predicate(norm(name)))
+      .reduce((total,[,qty])=>total+qty,0);
+    const brasatoPortions=recipePlates(k=>k.includes('brasato'));
+    const focacciaMilaPortions=recipePlates(k=>k.includes('focacci')&&/mila|milanesa/.test(k));
+    const batataSupremoPortions=recipePlates(k=>k.includes('batata')&&k.includes('suprem'));
+    const mortadelaPortions=recipePlates(k=>k.includes('focacci')&&k.includes('mortadela'));
+    const confitadoGrams=60*(brasatoPortions+batataSupremoPortions+mortadelaPortions);
+    if(confitadoGrams>0)addDirect(directNormal,'Tomates confitados x 500 g',confitadoGrams/500,'60 g por Batata Supremo, Focaccia mortadela o Grand Brasato · bolsas de 500 g');
+    if(brasatoPortions>0)addDirect(directNormal,'Manteca de salvia (kg)',brasatoPortions*.03,'30 g por porción de Grand Brasato · kg; envase pendiente');
+    if(focacciaMilaPortions>0)addDirect(directNormal,'Mayonesa ahumada (kg)',focacciaMilaPortions*.05,'50 g por focaccia de milanesa · kg; envase pendiente');
+
     // La opción de carne puede figurar como modificador; platos explícitos
     // sin selección de tipo se revisan aparte para no imputar pollo como vacuna.
     // Los modificadores «Tipo de milanesa» se cuentan por su producto padre
@@ -202,8 +216,9 @@
     directNames.forEach(name=>{
       const vn=directNormal[name]?.q||0,vs=directSpecial[name]?.q||0;
       const target=vn*(1+safety)+vs;
-      const st=n(stock[name]);const qty=Math.max(0,Math.ceil(target-st));
-      if(qty)lines.push({name,qty,unit:'unidades',forecast:target,stock:st,note:`${directNormal[name]?.note||directSpecial[name]?.note||''}${vn?' · normal +20%':''}${vs?' · Día 29 sin margen extra':''}`});
+      const st=n(stock[name]);const isKg=name.endsWith('(kg)');
+      const qty=Math.max(0,isKg?Math.ceil((target-st)*10)/10:Math.ceil(target-st));
+      if(qty)lines.push({name,qty,unit:isKg?'kg':name.includes('x 500 g')?'bolsas':'unidades',forecast:target,stock:st,note:`${directNormal[name]?.note||directSpecial[name]?.note||''}${vn?' · normal +20%':''}${vs?' · Día 29 sin margen extra':''}`});
     });
 
     const warning=apply29?(mix.dates.length?
