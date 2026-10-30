@@ -189,16 +189,19 @@ async async function showStockWhatsAppReport(stock){
  const products=document.getElementById('receiptProducts'),status=document.getElementById('receiptStatus');
  const providers=[...new Set(stockItems.map(x=>x[2]))];
  providerEl.innerHTML=providers.map(p=>'<option value="'+p+'">'+p+'</option>').join('');
- function addRow(){
-  const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;margin:12px 0;flex-wrap:wrap';
-  const sel=document.createElement('select');sel.className='search-input';sel.style.flex='2';
-  const qty=document.createElement('input');qty.type='number';qty.min='0.01';qty.step='0.01';qty.placeholder='Cantidad recibida';qty.className='search-input';qty.style.flex='1';
-  const del=document.createElement('button');del.type='button';del.className='ghost-btn';del.textContent='Quitar';del.onclick=()=>row.remove();
-  row.append(sel,qty,del);products.append(row);fillSelect(sel);sel.addEventListener('change',()=>fillQty());function fillQty(){const name=sel.value;if(packagingCapacity[name]){qty.replaceWith(document.createElement('span'));const span=row.children[1];span.innerHTML=packagingFields(name,0)}else{const field=row.children[1];field.outerHTML='<input data-pack-total type="number" min="0" step="0.01" placeholder="Cantidad recibida" class="search-input" style="flex:1">'}}fillQty();
+
+ function renderReceiptProducts(){
+  products.innerHTML='';
+  stockItems.filter(x=>x[2]===providerEl.value).forEach(([name,unit])=>{
+   const row=document.createElement('div');row.dataset.receiptName=name;row.style.cssText='padding:12px 0;border-bottom:1px solid #444';
+   const label=document.createElement('label');label.textContent=name+' ('+unit+')';label.style.cssText='display:block;font-weight:600;margin-bottom:7px';row.append(label);
+   if(packagingCapacity[name]){const wrap=document.createElement('div');wrap.innerHTML=packagingFields(name,0);row.append(wrap)}
+   else{const input=document.createElement('input');input.type='number';input.min='0';input.step='0.01';input.placeholder='Cantidad recibida (dejar vacío si no ingresó)';input.className='search-input';input.dataset.packTotal='';input.style.width='100%';row.append(input)}
+   products.append(row);
+  });
  }
- function fillSelect(sel){const options=stockItems.filter(x=>x[2]===providerEl.value);sel.innerHTML=options.map(x=>'<option value="'+x[0]+'">'+x[0]+' ('+x[1]+')</option>').join('');}
- providerEl.onchange=()=>{products.innerHTML='';addRow()};
- document.getElementById('receiptAdd').onclick=addRow;
+ providerEl.onchange=renderReceiptProducts;
+ document.getElementById('receiptAdd').style.display='none';
  async function history(){
   const el=document.getElementById('receiptHistory');
   try{const rows=(await window.MontiCloud.listReceipts()).slice(-20).reverse();el.textContent='';
@@ -207,14 +210,14 @@ async async function showStockWhatsAppReport(stock){
   }catch(e){el.textContent='No se pudo consultar el historial: '+e.message}
  }
  document.getElementById('receiptSave').onclick=async()=>{
-  const btn=document.getElementById('receiptSave'),items=[...products.children].map(row=>({name:row.querySelector('select').value,qty:Number(packagingQuantity(row))}));
+  const btn=document.getElementById('receiptSave'),items=[...products.children].map(row=>({name:row.dataset.receiptName,qty:Number(packagingQuantity(row))})).filter(x=>x.qty>0);
   if(!items.length||items.some(x=>!Number.isFinite(x.qty)||x.qty<=0)){status.textContent='Completá todas las cantidades con valores mayores a cero.';return}
   if(new Set(items.map(x=>x.name)).size!==items.length){status.textContent='No repitas un producto en la misma recepción.';return}
   btn.disabled=true;status.textContent='Guardando en Firebase…';
-  try{await window.MontiCloud.saveReceipt(providerEl.value,items,document.getElementById('receiptNotes').value.trim());status.textContent='Ingreso guardado ✓. No se modificó el stock.';products.innerHTML='';addRow();document.getElementById('receiptNotes').value='';await history()}
+  try{await window.MontiCloud.saveReceipt(providerEl.value,items,document.getElementById('receiptNotes').value.trim());status.textContent='Ingreso guardado ✓. No se modificó el stock.';renderReceiptProducts();document.getElementById('receiptNotes').value='';await history()}
   catch(e){status.textContent='Error: no se guardó el ingreso. '+e.message}finally{btn.disabled=false}
  };
- addRow();setTimeout(history,1500);
+ renderReceiptProducts();setTimeout(history,1500);
 })();
 
 /* Simulaciones solo para el administrador: lectura local, sin escrituras a Firebase. */
@@ -269,7 +272,7 @@ async async function showStockWhatsAppReport(stock){
  if(btnReceipt)btnReceipt.onclick=()=>{
   if(!window.MontiCloud?.isAdmin)return;
   const provider=document.getElementById('receiptProvider').value;
-  const items=[...document.getElementById('receiptProducts').children].map(row=>({name:row.querySelector('select')?.value,qty:packagingQuantity(row)}));
+  const items=[...document.getElementById('receiptProducts').children].map(row=>({name:row.dataset.receiptName,qty:packagingQuantity(row)})).filter(x=>x.qty>0);
   const lines=['🧪 MONTI · SIMULACIÓN DE INGRESO','NO GUARDADO · NO MODIFICA STOCK','Fecha: '+new Date().toLocaleString('es-AR'),'Proveedor: '+provider,'',...items.map(x=>x.name+': '+fmt(x.qty)),'','Observaciones: '+(document.getElementById('receiptNotes').value||'Sin observaciones')];
   panel('receiptPreviewPanel','Vista previa de la recepción',lines.join('\n'),document.getElementById('receiptSave')?.closest('section'));
  };
