@@ -64,13 +64,13 @@
         </section>
 
         <section class="view" data-view-panel="stock">
-          <div class="page-heading"><div><p class="eyebrow">STOCK</p><h2>Stock operativo</h2><p class="muted">Filtrá por proveedor y cargá cada insumo en la unidad indicada. La Artesanal permite cargar stock a granel y porciones ya preparadas.</p></div><button id="saveStock" class="primary-btn">Guardar stock</button></div><p id="cloudSaveStatus" class="muted" role="status" aria-live="polite">Conectando con Firebase…</p><p id="stockSavedAt" class="muted" aria-live="polite">Última carga de stock: sin registro</p>
+          <div class="page-heading"><div><p class="eyebrow">STOCK</p><h2>Stock operativo</h2><p class="muted">Filtrá por proveedor y cargá cada insumo en la unidad indicada. La Artesanal permite cargar stock a granel y porciones ya preparadas.</p></div><div><button id="previewStock" class="ghost-btn" data-admin-only style="display:none">Simular informe</button> <button id="saveStock" class="primary-btn">Guardar stock</button></div></div><p id="cloudSaveStatus" class="muted" role="status" aria-live="polite">Conectando con Firebase…</p><p id="stockSavedAt" class="muted" aria-live="polite">Última carga de stock: sin registro</p>
           <section class="card"><div class="toolbar"><input id="stockSearch" class="search-input" placeholder="Buscar insumo…"><select id="stockProvider"><option value="all">Todos los proveedores</option><option>La Artesanal</option><option>Centro de Producción</option><option>Breaders</option><option>Packaging</option></select></div><div id="stockGrid" class="stock-table"></div></section>
         </section>
 
         <section class="view" data-view-panel="receipts">
  <div class="page-heading"><div><p class="eyebrow">MOVIMIENTOS</p><h2>Ingreso de mercadería</h2><p class="muted">Registrar ingresos NO modifica el stock contado.</p></div></div>
- <section class="card"><label>Proveedor</label><select id="receiptProvider"></select><div id="receiptProducts"></div><button type="button" id="receiptAdd" class="ghost-btn">+ Agregar producto</button><p><label>Remito / observaciones</label><input id="receiptNotes" class="search-input" placeholder="Opcional"></p><button type="button" id="receiptSave" class="primary-btn">Guardar ingreso</button><p id="receiptStatus" role="status"></p></section>
+ <section class="card"><label>Proveedor</label><select id="receiptProvider"></select><div id="receiptProducts"></div><button type="button" id="receiptAdd" class="ghost-btn">+ Agregar producto</button><p><label>Remito / observaciones</label><input id="receiptNotes" class="search-input" placeholder="Opcional"></p><button type="button" id="previewReceipt" class="ghost-btn" data-admin-only style="display:none">Simular ingreso</button> <button type="button" id="receiptSave" class="primary-btn">Guardar ingreso</button><p id="receiptStatus" role="status"></p></section>
  <section class="card"><h3>Últimos ingresos</h3><div id="receiptHistory">Cargando…</div></section>
  </section>
  <section class="view" data-view-panel="orders">
@@ -97,6 +97,6 @@
     </div>
   </div>
   <script type="module" src="firebase-monti-v2.js?v=20261030-ingresos1"></script>
-  <script src="engine.js?v=20261012-1132"></script><script src="engine-fix-v04.js?v=20261012-1132"></script><script src="app.js?v=20261030-ingresos1"></script><script src="engine-stockdate-fix.js?v=20261012-1132"></script><script src="engine-cdp29-fix.js?v=20261015-recetas2"></script><script src="planning-core.js?v=20261012-1132"></script><script src="engine-unified-planning.js?v=20261012-1132"></script><script src="engine-day29-policy.js?v=20261012-1132"></script><script src="engine-portions-stock.js?v=20261012-1132"></script><script src="engine-cdp-turn-aware.js?v=20261013-cdp1"></script><script src="engine-artesanal-dynamic.js?v=20261015-rigatoni"></script>
+  <script src="engine.js?v=20261012-1132"></script><script src="engine-fix-v04.js?v=20261012-1132"></script><script src="app.js?v=20261030-simulador1"></script><script src="engine-stockdate-fix.js?v=20261012-1132"></script><script src="engine-cdp29-fix.js?v=20261015-recetas2"></script><script src="planning-core.js?v=20261012-1132"></script><script src="engine-unified-planning.js?v=20261012-1132"></script><script src="engine-day29-policy.js?v=20261012-1132"></script><script src="engine-portions-stock.js?v=20261012-1132"></script><script src="engine-cdp-turn-aware.js?v=20261013-cdp1"></script><script src="engine-artesanal-dynamic.js?v=20261015-rigatoni"></script>
 </body>
 </html>
