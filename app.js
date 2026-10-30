@@ -45,7 +45,7 @@ $('quickUpload').addEventListener('click',()=>{if(!currentAdmin)return;navigate(
 function updateStockTimestamp(){const el=$('stockSavedAt');if(!el)return;const raw=localStorage.getItem('monti.web.stock.v3.savedAt'),date=raw?new Date(raw):null;el.textContent=date&&!Number.isNaN(date.getTime())?'Última carga de stock: '+date.toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'}):'Última carga de stock: sin registro';}
 function renderStock(){updateStockTimestamp();const saved=getStock(),q=norm($('stockSearch')?.value||''),provider=$('stockProvider')?.value||'all';const filtered=stockItems.filter(([name,,p])=>(!q||norm(name).includes(q))&&(provider==='all'||p===provider));$('stockGrid').innerHTML=`<div class="stock-head"><span>Insumo</span><span>Proveedor</span><span>Unidad de carga</span><span>Stock</span></div>`+filtered.map(([name,unit,p])=>{const idx=stockItems.findIndex(x=>x[0]===name);return `<div class="stock-row"><strong>${name}</strong><span class="provider-cell">${p}</span><span class="unit-cell">${unit}</span><input data-stock="${idx}" type="number" step="0.01" inputmode="decimal" value="${saved[name]??''}" placeholder="0"></div>`}).join('')}
 $('stockSearch').addEventListener('input',renderStock);$('stockProvider').addEventListener('change',renderStock);
-$('saveStock').addEventListener('click',async()=>{const obj={...getStock()};document.querySelectorAll('[data-stock]').forEach(input=>{const idx=Number(input.dataset.stock);obj[stockItems[idx][0]]=Number(input.value||0)});const saveButton=$('saveStock');const cloudStatus=$('cloudSaveStatus');const setStatus=message=>{saveButton.textContent=message;if(cloudStatus)cloudStatus.textContent=message};saveButton.disabled=true;setStatus('Guardando exclusivamente en Firebase…');try{if(!window.MontiCloud)throw Error('Firebase no está disponible');await window.MontiCloud.saveStock(obj);MontiPlanningCore.saveSnapshotNow();updateStockTimestamp();generateOrders();renderDashboard();setStatus('Guardado y verificado en Firebase ✓')}catch(err){console.warn('Error al guardar stock en Firebase',err);setStatus('ERROR: no se guardó en Firebase ⚠');alert('No se guardó el stock en Firebase. Los cambios siguen en pantalla; revisá la conexión y reintentá.')}finally{saveButton.disabled=false}});
+$('saveStock').addEventListener('click',async()=>{const obj={...getStock()};document.querySelectorAll('[data-stock]').forEach(input=>{const idx=Number(input.dataset.stock);obj[stockItems[idx][0]]=Number(input.value||0)});const saveButton=$('saveStock');const cloudStatus=$('cloudSaveStatus');const setStatus=message=>{saveButton.textContent=message;if(cloudStatus)cloudStatus.textContent=message};saveButton.disabled=true;setStatus('Guardando exclusivamente en Firebase…');try{if(!window.MontiCloud)throw Error('Firebase no está disponible');await window.MontiCloud.saveStock(obj);MontiPlanningCore.saveSnapshotNow();updateStockTimestamp();generateOrders();renderDashboard();setStatus('Guardado y verificado en Firebase ✓');showStockWhatsAppReport(obj)}catch(err){console.warn('Error al guardar stock en Firebase',err);setStatus('ERROR: no se guardó en Firebase ⚠');alert('No se guardó el stock en Firebase. Los cambios siguen en pantalla; revisá la conexión y reintentá.')}finally{saveButton.disabled=false}});
 
 $('fileInput').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;if(!currentAdmin){alert('Solo el administrador puede actualizar Fudo.');return}try{const buf=await file.arrayBuffer();const wb=XLSX.read(buf,{type:'array',cellDates:true});await processWorkbook(wb,file.name,{buffer:buf,size:file.size,type:file.type,lastModified:file.lastModified})}catch(err){console.error(err);alert('Error al cargar ventas: '+String(err?.message||err?.code||err))}});
 
@@ -84,3 +84,35 @@ renderStock();updateFudoUi();renderDashboard(); // Las ventas se recuperan desde
 // Al regresar a la aplicación, recalcular con el reloj actual del dispositivo.
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&parsedData)generateOrders()});
 window.addEventListener('focus',()=>{if(parsedData)generateOrders()});
+
+
+/* Informe de stock: se genera exclusivamente tras confirmación de Firebase. */
+function showStockWhatsAppReport(stock){
+ const now=new Date(),stamp=now.toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'});
+ const shift=now.getHours()<17?'Mañana':'Noche';
+ const fmt=v=>Number(v).toLocaleString('es-AR',{maximumFractionDigits:2});
+ const groups=new Map();
+ for(const [name,unit,provider] of stockItems){
+  if(!groups.has(provider))groups.set(provider,[]);
+  const value=Number(stock[name]??0);
+  groups.get(provider).push(name+': '+fmt(value)+' '+unit+(value===0?' ⚠️':''));
+ }
+ // Incluir stock porcionado y otros campos persistidos que no figuran en la tabla principal.
+ const known=new Set(stockItems.map(x=>x[0]));
+ const extra=Object.keys(stock).filter(k=>!known.has(k)).sort();
+ if(extra.length)groups.set('PORCIONES Y OTROS REGISTROS',extra.map(k=>k+': '+fmt(stock[k]??0)));
+ const lines=['📋 MONTI | CONTROL DE STOCK','📅 '+stamp,'🕘 Turno: '+shift,'','Stock guardado en Firebase ✓'];
+ for(const [provider,items] of groups){lines.push('','━━━━━━━━━━━━━━━━','📦 '+provider.toUpperCase(),'━━━━━━━━━━━━━━━━',...items);}
+ const report=lines.join('\n');
+ let panel=document.getElementById('stockWhatsAppReport');
+ if(!panel){
+  panel=document.createElement('section');panel.id='stockWhatsAppReport';panel.className='card';
+  const grid=document.getElementById('stockGrid');
+  grid?.closest('section')?.insertAdjacentElement('beforebegin',panel);
+ }
+ panel.innerHTML='<h3>📋 Informe de stock listo para compartir</h3><p class="muted">Se generó después de guardar correctamente en Firebase.</p><textarea id="stockWhatsAppText" readonly rows="16" style="width:100%;white-space:pre-wrap"></textarea><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"><button id="stockReportCopy" class="primary-btn">Copiar informe</button><button id="stockReportShare" class="ghost-btn">Compartir por WhatsApp</button></div>';
+ panel.querySelector('textarea').value=report;
+ panel.querySelector('#stockReportCopy').onclick=async()=>{try{await navigator.clipboard.writeText(report);panel.querySelector('#stockReportCopy').textContent='Copiado ✓'}catch{panel.querySelector('textarea').select();document.execCommand('copy')}};
+ panel.querySelector('#stockReportShare').onclick=()=>window.open('https://wa.me/?text='+encodeURIComponent(report),'_blank','noopener');
+ panel.scrollIntoView({behavior:'smooth',block:'start'});
+}
