@@ -7,6 +7,8 @@ service cloud.firestore {
     match /monti/stock {
       allow read, write: if loggedIn();
     }
+    match /monti/stock/receipts/{receiptId} { allow read, create: if loggedIn(); allow update, delete: if admin(); }
+    match /monti/stock/counts/{countId} { allow read, create: if loggedIn(); allow update, delete: if admin(); }
     match /monti/fudo {
       allow read: if loggedIn();
       allow write: if admin();
