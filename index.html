@@ -70,7 +70,7 @@
 
         <section class="view" data-view-panel="receipts">
  <div class="page-heading"><div><p class="eyebrow">MOVIMIENTOS</p><h2>Ingreso de mercadería</h2><p class="muted">Registrar ingresos NO modifica el stock contado.</p></div></div>
- <section class="card"><label>Proveedor</label><select id="receiptProvider"></select><div id="receiptProducts"></div><button type="button" id="receiptAdd" class="ghost-btn">+ Agregar producto</button><p><label>Remito / observaciones</label><input id="receiptNotes" class="search-input" placeholder="Opcional"></p><button type="button" id="previewReceipt" class="ghost-btn" data-admin-only style="display:none">Simular ingreso</button> <button type="button" id="receiptSave" class="primary-btn">Guardar ingreso</button><p id="receiptStatus" role="status"></p></section>
+ <section class="card"><label>Proveedor</label><select id="receiptProvider"></select><div id="receiptProducts"></div><p class="muted">Se muestran todos los artículos del proveedor. Completá solo los que ingresaron.</p><button type="button" id="receiptAdd" class="ghost-btn" style="display:none">+ Agregar producto</button><p><label>Remito / observaciones</label><input id="receiptNotes" class="search-input" placeholder="Opcional"></p><button type="button" id="previewReceipt" class="ghost-btn" data-admin-only style="display:none">Simular ingreso</button> <button type="button" id="receiptSave" class="primary-btn">Guardar ingreso</button><p id="receiptStatus" role="status"></p></section>
  <section class="card"><h3>Últimos ingresos</h3><div id="receiptHistory">Cargando…</div></section>
  </section>
  <section class="view" data-view-panel="orders">
@@ -97,6 +97,6 @@
     </div>
   </div>
   <script type="module" src="firebase-monti-v2.js?v=20261030-turnos1"></script>
-  <script src="engine.js?v=20261012-1132"></script><script src="engine-fix-v04.js?v=20261012-1132"></script><script src="app.js?v=20261030-rigatonicdp4"></script><script src="engine-stockdate-fix.js?v=20261012-1132"></script><script src="engine-cdp29-fix.js?v=20261015-recetas2"></script><script src="planning-core.js?v=20261012-1132"></script><script src="engine-unified-planning.js?v=20261012-1132"></script><script src="engine-day29-policy.js?v=20261012-1132"></script><script src="engine-portions-stock.js?v=20261012-1132"></script><script src="engine-cdp-turn-aware.js?v=20261013-cdp1"></script><script src="engine-artesanal-dynamic.js?v=20261015-rigatoni"></script>
+  <script src="engine.js?v=20261012-1132"></script><script src="engine-fix-v04.js?v=20261012-1132"></script><script src="app.js?v=20261030-ingresoscompletos5"></script><script src="engine-stockdate-fix.js?v=20261012-1132"></script><script src="engine-cdp29-fix.js?v=20261015-recetas2"></script><script src="planning-core.js?v=20261012-1132"></script><script src="engine-unified-planning.js?v=20261012-1132"></script><script src="engine-day29-policy.js?v=20261012-1132"></script><script src="engine-portions-stock.js?v=20261012-1132"></script><script src="engine-cdp-turn-aware.js?v=20261013-cdp1"></script><script src="engine-artesanal-dynamic.js?v=20261015-rigatoni"></script>
 </body>
 </html>
