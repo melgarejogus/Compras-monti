@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, sendPasswordResetEmail, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-import { getFirestore, doc, getDoc, setDoc, serverTimestamp, collection, getDocs, writeBatch } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { getFirestore, doc, getDoc, setDoc, serverTimestamp, collection, getDocs, writeBatch, runTransaction } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 
 const config={apiKey:'AIzaSyCK5bTZLaKRa27YvRIXc5O3Q6pQHOz7XHo',authDomain:'monti-compras.firebaseapp.com',projectId:'monti-compras',storageBucket:'monti-compras.firebasestorage.app',messagingSenderId:'436016502476',appId:'1:436016502476:web:c6a861d2dfeb0100021469',measurementId:'G-63QJR32Q4C'};
 const adminUid='xCp3XpmIPVN6nVUFGO8LmQi0Sg33';
@@ -65,6 +65,44 @@ window.MontiCloud={
  async listReceipts(){if(!signedIn||!authorized)throw Error('No autorizado');const snap=await getDocs(receiptsRef);return snap.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>String(a.at).localeCompare(String(b.at)));},
  async saveReceipt(provider,items,notes=''){if(!signedIn||!authorized||!cloudReady)throw Error('Firebase no está listo');if(!provider||!Array.isArray(items)||!items.length||items.some(x=>!x.name||!Number.isFinite(x.qty)||x.qty<=0))throw Error('Recepción inválida');const at=new Date().toISOString(),ref=doc(receiptsRef);await setDoc(ref,{provider,items,notes,at,by:auth.currentUser.uid,createdAt:serverTimestamp()});return {id:ref.id,at};},
  async listCounts(){if(!signedIn||!authorized)throw Error('No autorizado');const snap=await getDocs(countsRef);return snap.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>String(a.at).localeCompare(String(b.at)));},
+
+ async getTurnStatus(){if(!signedIn||!authorized)throw Error('No autorizado');const snap=await getDoc(stockRef);return snap.exists()?snap.data().turnControl||null:null;},
+ async saveProviderStock(provider,changes,turnKey){
+  if(!signedIn||!authorized||!cloudReady)throw Error('Firebase no está listo');
+  if(!provider||!turnKey||!changes||!Object.keys(changes).length)throw Error('Carga inválida');
+  const savedAt=new Date().toISOString();
+  const result=await runTransaction(db,async tx=>{
+   const snap=await tx.get(stockRef),old=snap.exists()?snap.data():{};
+   const prior=old.turnControl?.key===turnKey?old.turnControl:{key:turnKey,providers:{},closed:false};
+   if(prior.closed)throw Error('El turno ya fue cerrado. No se puede modificar.');
+   const items={...(old.items||{}),...changes};
+   const turnControl={...prior,providers:{...prior.providers,[provider]:{at:savedAt,by:auth.currentUser.uid}},closed:false};
+   tx.set(stockRef,{items,savedAt,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid,turnControl});
+   return {items,turnControl};
+  });
+  localStorage.setItem(stockKey,JSON.stringify(result.items));
+  localStorage.setItem(savedAtKey,savedAt);
+  window.renderStock?.();window.generateOrders?.();
+  return result;
+ },
+ async closeTurn(turnKey,providers,allowPending=false){
+  if(!signedIn||!authorized||!cloudReady)throw Error('Firebase no está listo');
+  if(allowPending&&!isAdmin)throw Error('Solo el administrador puede cerrar con pendientes');
+  const at=new Date().toISOString();
+  const result=await runTransaction(db,async tx=>{
+   const snap=await tx.get(stockRef);if(!snap.exists())throw Error('No hay stock');
+   const old=snap.data(),control=old.turnControl;
+   if(!control||control.key!==turnKey)throw Error('El turno no tiene controles registrados');
+   if(control.closed)throw Error('Este turno ya fue cerrado');
+   const pending=providers.filter(p=>!control.providers?.[p]);
+   if(pending.length&&!allowPending)throw Error('Faltan proveedores: '+pending.join(', '));
+   const updated={...control,closed:true,closedAt:at,closedBy:auth.currentUser.uid,pending};
+   tx.update(stockRef,{turnControl:updated});
+   tx.set(doc(countsRef),{items:old.items,at,by:auth.currentUser.uid,turnKey,providers:control.providers,pending,createdAt:serverTimestamp()});
+   return {items:old.items,control:updated};
+  });
+  return result;
+ },
  async saveStock(items){
   if(!signedIn||!authorized||!cloudReady)throw Error('Usuario no autorizado o Firebase todavía no está listo. No se guardó.');
   const savedAt=new Date().toISOString();
