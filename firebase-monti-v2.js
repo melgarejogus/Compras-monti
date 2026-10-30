@@ -21,6 +21,8 @@ let authorized=false;
 const salesManifest=doc(db,'monti','fudo');
 const salesChunks=collection(db,'monti','fudo','chunks');
 const stockRef=doc(db,'monti','stock');
+const receiptsRef=collection(db,'monti','stock','receipts');
+const countsRef=collection(db,'monti','stock','counts');
 const showError=(message)=>{error.textContent=message};
 const localStock=()=>{try{return JSON.parse(localStorage.getItem(stockKey)||'{}')}catch{return {}}};
 let cloudReady=false;
@@ -60,10 +62,14 @@ window.MontiCloud={
   if(parts.some(p=>!p.exists()))throw Error('Faltan bloques de ventas en Firebase');
   return {data:JSON.parse(parts.map(p=>p.data().part).join('')),meta:metaJson?JSON.parse(metaJson):meta};
  },
+ async listReceipts(){if(!signedIn||!authorized)throw Error('No autorizado');const snap=await getDocs(receiptsRef);return snap.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>String(a.at).localeCompare(String(b.at)));},
+ async saveReceipt(provider,items,notes=''){if(!signedIn||!authorized||!cloudReady)throw Error('Firebase no está listo');if(!provider||!Array.isArray(items)||!items.length||items.some(x=>!x.name||!Number.isFinite(x.qty)||x.qty<=0))throw Error('Recepción inválida');const at=new Date().toISOString(),ref=doc(receiptsRef);await setDoc(ref,{provider,items,notes,at,by:auth.currentUser.uid,createdAt:serverTimestamp()});return {id:ref.id,at};},
+ async listCounts(){if(!signedIn||!authorized)throw Error('No autorizado');const snap=await getDocs(countsRef);return snap.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>String(a.at).localeCompare(String(b.at)));},
  async saveStock(items){
   if(!signedIn||!authorized||!cloudReady)throw Error('Usuario no autorizado o Firebase todavía no está listo. No se guardó.');
   const savedAt=new Date().toISOString();
   await setDoc(stockRef,{items,savedAt,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});
+  await setDoc(doc(countsRef),{items,at:savedAt,by:auth.currentUser.uid,createdAt:serverTimestamp()});
   const confirmed=await getDoc(stockRef);
   if(!confirmed.exists()||confirmed.data().savedAt!==savedAt)throw Error('Firebase no confirmó el guardado actual.');
   localStorage.setItem(stockKey,JSON.stringify(items)); // Copia técnica para el motor de cálculos, no fuente oficial.
