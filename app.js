@@ -59,7 +59,46 @@ function packagingQuantity(row){
 
 function renderStock(){updateStockTimestamp();const saved=getStock(),q=norm($('stockSearch')?.value||''),provider=$('stockProvider')?.value||'all';const filtered=stockItems.filter(([name,,p])=>(!q||norm(name).includes(q))&&(provider==='all'||p===provider));$('stockGrid').innerHTML=`<div class="stock-head"><span>Insumo</span><span>Proveedor</span><span>Unidad de carga</span><span>Stock</span></div>`+filtered.map(([name,unit,p])=>{const idx=stockItems.findIndex(x=>x[0]===name);return `<div class="stock-row"><strong>${name}</strong><span class="provider-cell">${p}</span><span class="unit-cell">${unit}</span><span data-stock="${idx}">${provider==='Packaging'||p==='Packaging'?packagingFields(name,saved[name]??0):'<input data-pack-total type="number" step="0.01" inputmode="decimal" value="'+(saved[name]??'')+'" placeholder="0">'}</span></div>`}).join('')}
 $('stockSearch').addEventListener('input',renderStock);$('stockProvider').addEventListener('change',renderStock);
-$('saveStock').addEventListener('click',async()=>{const obj={...getStock()};const selectedProvider=$('stockProvider').value;document.querySelectorAll('[data-stock]').forEach(row=>{const idx=Number(row.dataset.stock);if(stockItems[idx]?.[2]===selectedProvider)obj[stockItems[idx][0]]=packagingQuantity(row)});const saveButton=$('saveStock');const cloudStatus=$('cloudSaveStatus');const setStatus=message=>{saveButton.textContent=message;if(cloudStatus)cloudStatus.textContent=message};saveButton.disabled=true;setStatus('Guardando exclusivamente en Firebase…');try{if(!window.MontiCloud)throw Error('Firebase no está disponible');await window.MontiCloud.saveStock(obj);MontiPlanningCore.saveSnapshotNow();updateStockTimestamp();generateOrders();renderDashboard();setStatus('Stock de '+selectedProvider+' guardado en Firebase ✓');await showStockWhatsAppReport(obj)}catch(err){console.warn('Error al guardar stock en Firebase',err);setStatus('ERROR: no se guardó en Firebase ⚠');alert('No se guardó el stock en Firebase. Los cambios siguen en pantalla; revisá la conexión y reintentá.')}finally{saveButton.disabled=false}});
+
+const stockProviders=[...new Set(stockItems.map(x=>x[2]))];
+const stockTurnKey=()=>{const d=new Date(),date=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');return date+'-'+(d.getHours()<17?'manana':'noche')};
+async function refreshStockTurn(){
+ const target=$('turnProgress');if(!target)return;
+ try{
+  const key=stockTurnKey(),control=await window.MontiCloud.getTurnStatus(),current=control?.key===key?control:null;
+  const done=stockProviders.filter(p=>current?.providers?.[p]).length;
+  target.innerHTML='<p><strong>'+key.replace('-',' · ')+'</strong> · '+done+' de '+stockProviders.length+' proveedores controlados'+(current?.closed?' · CERRADO ✓':'')+'</p>'+stockProviders.map(p=>'<div style="padding:7px 0;border-bottom:1px solid #555">'+(current?.providers?.[p]?'✅ ':'○ ')+p+(current?.providers?.[p]?' · '+new Date(current.providers[p].at).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):' · Pendiente')+'</div>').join('');
+  $('closeStockTurn').disabled=!!current?.closed||done!==stockProviders.length;
+  $('forceCloseStockTurn').disabled=!!current?.closed||done===0;
+ }catch(e){target.textContent='No se pudo leer el control del turno: '+e.message;$('closeStockTurn').disabled=true;$('forceCloseStockTurn').disabled=true}
+}
+$('saveStock').addEventListener('click',async()=>{
+ const provider=$('stockProvider').value,changes={};
+ document.querySelectorAll('[data-stock]').forEach(row=>{const item=stockItems[Number(row.dataset.stock)];if(item?.[2]===provider)changes[item[0]]=packagingQuantity(row)});
+ if(!Object.keys(changes).length){alert('No hay productos visibles. Quitá el filtro de búsqueda antes de guardar.');return}
+ if(stockItems.filter(x=>x[2]===provider).length!==Object.keys(changes).length){alert('Para guardar este proveedor, quitá la búsqueda y completá todos sus productos.');return}
+ if(Object.values(changes).some(v=>!Number.isFinite(v)||v<0)){alert('Revisá las cantidades ingresadas.');return}
+ const button=$('saveStock');button.disabled=true;
+ try{
+  const result=await window.MontiCloud.saveProviderStock(provider,changes,stockTurnKey());
+  MontiPlanningCore.saveSnapshotNow();updateStockTimestamp();generateOrders();renderDashboard();
+  $('cloudSaveStatus').textContent='Stock de '+provider+' guardado ✓. El informe se genera al cerrar el turno.';
+  await refreshStockTurn();
+ }catch(e){alert('No se guardó: '+e.message)}finally{button.disabled=false}
+});
+async function finishStockTurn(force){
+ const button=force?$('forceCloseStockTurn'):$('closeStockTurn');button.disabled=true;
+ try{
+  const result=await window.MontiCloud.closeTurn(stockTurnKey(),stockProviders,force);
+  await refreshStockTurn();
+  await showStockWhatsAppReport(result.items);
+  if(result.control.pending.length)alert('Cierre excepcional: faltan '+result.control.pending.join(', ')+'. Se indicará en el informe.');
+ }catch(e){alert('No se cerró el turno: '+e.message);await refreshStockTurn()}
+}
+$('closeStockTurn').onclick=()=>finishStockTurn(false);
+$('forceCloseStockTurn').onclick=()=>{if(!currentAdmin)return;if(confirm('¿Cerrar el turno con proveedores pendientes? Quedarán marcados como no verificados.'))finishStockTurn(true)};
+setTimeout(refreshStockTurn,2000);
+
 
 $('fileInput').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;if(!currentAdmin){alert('Solo el administrador puede actualizar Fudo.');return}try{const buf=await file.arrayBuffer();const wb=XLSX.read(buf,{type:'array',cellDates:true});await processWorkbook(wb,file.name,{buffer:buf,size:file.size,type:file.type,lastModified:file.lastModified})}catch(err){console.error(err);alert('Error al cargar ventas: '+String(err?.message||err?.code||err))}});
 
@@ -126,7 +165,8 @@ async async function showStockWhatsAppReport(stock){
  const known=new Set(stockItems.map(x=>x[0]));
  const extra=Object.keys(stock).filter(k=>!known.has(k)).sort();
  if(extra.length)groups.set('PORCIONES Y OTROS REGISTROS',extra.map(k=>k+': '+fmt(stock[k]??0)));
- const lines=['📋 MONTI | CONTROL DE STOCK','📅 '+stamp,'🕘 Turno: '+shift,'','Stock guardado en Firebase ✓'];
+ const turnCounts=await window.MontiCloud.listCounts().catch(()=>[]);const lastCount=turnCounts[turnCounts.length-1];const pending=lastCount?.pending||[];
+ const lines=['📋 MONTI | CONTROL DE STOCK','📅 '+stamp,'🕘 Turno: '+shift,'','Turno cerrado en Firebase ✓',...(pending.length?['⚠️ SIN VERIFICAR: '+pending.join(', ')]:[])];
  for(const [provider,items] of groups){lines.push('','━━━━━━━━━━━━━━━━','📦 '+provider.toUpperCase(),'━━━━━━━━━━━━━━━━',...items);}
  const report=lines.join('\n');
  let panel=document.getElementById('stockWhatsAppReport');
