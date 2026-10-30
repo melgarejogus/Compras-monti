@@ -69,7 +69,7 @@ window.MontiCloud={
   if(!signedIn||!authorized||!cloudReady)throw Error('Usuario no autorizado o Firebase todavía no está listo. No se guardó.');
   const savedAt=new Date().toISOString();
   await setDoc(stockRef,{items,savedAt,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});
-  await setDoc(doc(countsRef),{items,at:savedAt,by:auth.currentUser.uid,createdAt:serverTimestamp()});
+  try{await setDoc(doc(countsRef),{items,at:savedAt,by:auth.currentUser.uid,createdAt:serverTimestamp()});}catch(e){console.warn('Conteo histórico no registrado; stock principal guardado',e)}
   const confirmed=await getDoc(stockRef);
   if(!confirmed.exists()||confirmed.data().savedAt!==savedAt)throw Error('Firebase no confirmó el guardado actual.');
   localStorage.setItem(stockKey,JSON.stringify(items)); // Copia técnica para el motor de cálculos, no fuente oficial.
