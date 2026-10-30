@@ -227,21 +227,43 @@ async async function showStockWhatsAppReport(stock){
   el.scrollIntoView({behavior:'smooth',block:'start'});
  }
  const fmt=x=>Number(x).toLocaleString('es-AR',{maximumFractionDigits:2});
+
  const btnStock=document.getElementById('previewStock');
- if(btnStock)btnStock.onclick=()=>{
-  if(!window.MontiCloud?.isAdmin)return;
-  const previous=getStock(),actual={...previous};
-  document.querySelectorAll('[data-stock]').forEach(row=>{const name=stockItems[Number(row.dataset.stock)]?.[0];if(name)actual[name]=packagingQuantity(row)});
-  const groups=new Map();
-  for(const [name,unit,provider] of stockItems){
-   if(!groups.has(provider))groups.set(provider,[]);
-   const old=Number(previous[name]||0),now=Number(actual[name]||0);
-   groups.get(provider).push(name+' | Anterior '+fmt(old)+' | Ingresos: consultar registros | Actual '+fmt(now)+' | Diferencia '+fmt(old-now)+' '+unit);
+ const simulation={counts:{},receipts:{},completed:new Set(),provider:stockProviders[0]};
+ function startSimulation(){
+  simulation.counts={...getStock()};simulation.receipts={};simulation.completed=new Set();simulation.provider=stockProviders[0];
+  let overlay=document.getElementById('stockSimulator');
+  if(!overlay){overlay=document.createElement('div');overlay.id='stockSimulator';overlay.style.cssText='position:fixed;inset:0;z-index:9999;background:#101014;color:#f4f4f4;overflow:auto;padding:16px;box-sizing:border-box';document.body.append(overlay)}
+  drawSimulator();
+ }
+ function drawSimulator(){
+  const overlay=document.getElementById('stockSimulator'),provider=simulation.provider;
+  overlay.innerHTML='<div style="max-width:780px;margin:auto"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>🧪 Simulación de turno</h2><button type="button" id="simExit" class="ghost-btn">Salir sin guardar</button></div><p style="color:#ffd48a">MODO SIMULACIÓN · Nada de esta pantalla se guarda en Firebase.</p><p id="simProgress">'+simulation.completed.size+' de '+stockProviders.length+' proveedores simulados</p><label>Proveedor <select id="simProvider" class="search-input">'+stockProviders.map(p=>'<option '+(p===provider?'selected':'')+'>'+p+'</option>').join('')+'</select></label><div id="simRows"></div><button id="simMark" class="primary-btn">Marcar proveedor como simulado</button> <button id="simReport" class="ghost-btn">Generar informe simulado</button><div id="simOutput"></div></div>';
+  overlay.querySelector('#simExit').onclick=()=>overlay.remove();
+  overlay.querySelector('#simProvider').onchange=e=>{capture();simulation.provider=e.target.value;drawSimulator()};
+  const rows=overlay.querySelector('#simRows');
+  for(const [name,unit,p] of stockItems.filter(x=>x[2]===provider)){
+   const div=document.createElement('div');div.style.cssText='padding:10px 0;border-bottom:1px solid #444';
+   const label=document.createElement('strong');label.textContent=name+' ('+unit+')';div.append(label);
+   const current=Number(simulation.counts[name]||0);
+   if(packagingCapacity[name]){
+    const fields=document.createElement('div');fields.innerHTML=packagingFields(name,current);div.append(fields);
+   }else{
+    const inp=document.createElement('input');inp.type='number';inp.step='0.01';inp.min='0';inp.value=current;inp.dataset.packTotal='';inp.className='search-input';inp.style.cssText='display:block;width:100%;margin-top:6px';div.append(inp);
+   }
+   const entry=document.createElement('input');entry.type='number';entry.min='0';entry.step='0.01';entry.value=simulation.receipts[name]||0;entry.className='search-input';entry.placeholder='Ingresos simulados';entry.style.cssText='display:block;width:100%;margin-top:6px';entry.dataset.simReceipt='';div.dataset.simName=name;div.append(entry);
+   rows.append(div);
   }
-  const lines=['🧪 MONTI · SIMULACIÓN DE STOCK','NO GUARDADO · NO ENVIAR COMO CONTROL REAL','Fecha: '+new Date().toLocaleString('es-AR')];
-  for(const [provider,items] of groups)lines.push('','📦 '+provider.toUpperCase(),...items);
-  panel('stockPreviewPanel','Vista previa del conteo (sin ingresos históricos)',lines.join('\n'),document.getElementById('stockGrid')?.closest('section'));
- };
+  overlay.querySelector('#simMark').onclick=()=>{capture();simulation.completed.add(provider);drawSimulator()};
+  overlay.querySelector('#simReport').onclick=()=>{capture();const base=getStock(),lines=['🧪 MONTI | SIMULACIÓN DE CONTROL DE STOCK','NO GUARDADO EN FIREBASE','Fecha: '+new Date().toLocaleString('es-AR'),'Proveedores simulados: '+simulation.completed.size+'/'+stockProviders.length];
+   for(const p of stockProviders){lines.push('','📦 '+p.toUpperCase()+(simulation.completed.has(p)?' ✓':' ⚠️ PENDIENTE'));for(const [name,unit,owner] of stockItems.filter(x=>x[2]===p)){const before=Number(base[name]||0),entry=Number(simulation.receipts[name]||0),now=Number(simulation.counts[name]||0);lines.push(name+' | Anterior '+fmt(before)+' | Ingresos +'+fmt(entry)+' | Actual '+fmt(now)+' | Consumo aparente '+fmt(before+entry-now)+' '+unit)}}
+   const output=overlay.querySelector('#simOutput');output.innerHTML='<h3>Informe de simulación</h3><textarea readonly rows="18" style="width:100%;white-space:pre-wrap"></textarea><button type="button" class="ghost-btn">Copiar informe</button>';const report=lines.join('\\n');output.querySelector('textarea').value=report;output.querySelector('button').onclick=()=>navigator.clipboard.writeText(report);output.scrollIntoView({behavior:'smooth'});
+  };
+ }
+ function capture(){
+  document.querySelectorAll('#simRows [data-sim-name]').forEach(row=>{const name=row.dataset.simName;simulation.counts[name]=packagingQuantity(row);simulation.receipts[name]=Number(row.querySelector('[data-sim-receipt]').value||0)});
+ }
+ if(btnStock)btnStock.onclick=()=>{if(!window.MontiCloud?.isAdmin)return;startSimulation()};
  const btnReceipt=document.getElementById('previewReceipt');
  if(btnReceipt)btnReceipt.onclick=()=>{
   if(!window.MontiCloud?.isAdmin)return;
