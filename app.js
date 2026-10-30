@@ -45,7 +45,7 @@ $('quickUpload').addEventListener('click',()=>{if(!currentAdmin)return;navigate(
 function updateStockTimestamp(){const el=$('stockSavedAt');if(!el)return;const raw=localStorage.getItem('monti.web.stock.v3.savedAt'),date=raw?new Date(raw):null;el.textContent=date&&!Number.isNaN(date.getTime())?'Última carga de stock: '+date.toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'}):'Última carga de stock: sin registro';}
 function renderStock(){updateStockTimestamp();const saved=getStock(),q=norm($('stockSearch')?.value||''),provider=$('stockProvider')?.value||'all';const filtered=stockItems.filter(([name,,p])=>(!q||norm(name).includes(q))&&(provider==='all'||p===provider));$('stockGrid').innerHTML=`<div class="stock-head"><span>Insumo</span><span>Proveedor</span><span>Unidad de carga</span><span>Stock</span></div>`+filtered.map(([name,unit,p])=>{const idx=stockItems.findIndex(x=>x[0]===name);return `<div class="stock-row"><strong>${name}</strong><span class="provider-cell">${p}</span><span class="unit-cell">${unit}</span><input data-stock="${idx}" type="number" step="0.01" inputmode="decimal" value="${saved[name]??''}" placeholder="0"></div>`}).join('')}
 $('stockSearch').addEventListener('input',renderStock);$('stockProvider').addEventListener('change',renderStock);
-$('saveStock').addEventListener('click',async()=>{const obj={...getStock()};document.querySelectorAll('[data-stock]').forEach(input=>{const idx=Number(input.dataset.stock);obj[stockItems[idx][0]]=Number(input.value||0)});const saveButton=$('saveStock');const cloudStatus=$('cloudSaveStatus');const setStatus=message=>{saveButton.textContent=message;if(cloudStatus)cloudStatus.textContent=message};saveButton.disabled=true;setStatus('Guardando exclusivamente en Firebase…');try{if(!window.MontiCloud)throw Error('Firebase no está disponible');await window.MontiCloud.saveStock(obj);MontiPlanningCore.saveSnapshotNow();updateStockTimestamp();generateOrders();renderDashboard();setStatus('Guardado y verificado en Firebase ✓');showStockWhatsAppReport(obj)}catch(err){console.warn('Error al guardar stock en Firebase',err);setStatus('ERROR: no se guardó en Firebase ⚠');alert('No se guardó el stock en Firebase. Los cambios siguen en pantalla; revisá la conexión y reintentá.')}finally{saveButton.disabled=false}});
+$('saveStock').addEventListener('click',async()=>{const obj={...getStock()};document.querySelectorAll('[data-stock]').forEach(input=>{const idx=Number(input.dataset.stock);obj[stockItems[idx][0]]=Number(input.value||0)});const saveButton=$('saveStock');const cloudStatus=$('cloudSaveStatus');const setStatus=message=>{saveButton.textContent=message;if(cloudStatus)cloudStatus.textContent=message};saveButton.disabled=true;setStatus('Guardando exclusivamente en Firebase…');try{if(!window.MontiCloud)throw Error('Firebase no está disponible');await window.MontiCloud.saveStock(obj);MontiPlanningCore.saveSnapshotNow();updateStockTimestamp();generateOrders();renderDashboard();setStatus('Guardado y verificado en Firebase ✓');await showStockWhatsAppReport(obj)}catch(err){console.warn('Error al guardar stock en Firebase',err);setStatus('ERROR: no se guardó en Firebase ⚠');alert('No se guardó el stock en Firebase. Los cambios siguen en pantalla; revisá la conexión y reintentá.')}finally{saveButton.disabled=false}});
 
 $('fileInput').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;if(!currentAdmin){alert('Solo el administrador puede actualizar Fudo.');return}try{const buf=await file.arrayBuffer();const wb=XLSX.read(buf,{type:'array',cellDates:true});await processWorkbook(wb,file.name,{buffer:buf,size:file.size,type:file.type,lastModified:file.lastModified})}catch(err){console.error(err);alert('Error al cargar ventas: '+String(err?.message||err?.code||err))}});
 
@@ -87,7 +87,16 @@ window.addEventListener('focus',()=>{if(parsedData)generateOrders()});
 
 
 /* Informe de stock: se genera exclusivamente tras confirmación de Firebase. */
-function showStockWhatsAppReport(stock){
+async function showStockWhatsAppReport(stock){
+ let previous=null,receipts=[];
+ try{
+  const counts=await window.MontiCloud.listCounts();
+  previous=counts.length>1?counts[counts.length-2]:null;
+  if(previous)receipts=(await window.MontiCloud.listReceipts()).filter(x=>x.at>previous.at&&x.at<=counts[counts.length-1].at);
+ }catch(e){console.warn('Historial no disponible',e);}
+ const received={};
+ receipts.forEach(r=>r.items.forEach(x=>{received[x.name]=(received[x.name]||0)+Number(x.qty)}));
+
  const now=new Date(),stamp=now.toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'});
  const shift=now.getHours()<17?'Mañana':'Noche';
  const fmt=v=>Number(v).toLocaleString('es-AR',{maximumFractionDigits:2});
@@ -95,7 +104,8 @@ function showStockWhatsAppReport(stock){
  for(const [name,unit,provider] of stockItems){
   if(!groups.has(provider))groups.set(provider,[]);
   const value=Number(stock[name]??0);
-  groups.get(provider).push(name+': '+fmt(value)+' '+unit+(value===0?' ⚠️':''));
+  const before=previous?Number(previous.items?.[name]??0):null,entry=received[name]||0;const consumption=before===null?null:before+entry-value;
+  groups.get(provider).push(name+': '+(before===null?'Actual '+fmt(value):'Anterior '+fmt(before)+' | Ingresos +'+fmt(entry)+' | Actual '+fmt(value)+' | Consumo '+fmt(consumption))+' '+unit+(value===0?' ⚠️':''));
  }
  // Incluir stock porcionado y otros campos persistidos que no figuran en la tabla principal.
  const known=new Set(stockItems.map(x=>x[0]));
@@ -116,3 +126,37 @@ function showStockWhatsAppReport(stock){
  panel.querySelector('#stockReportShare').onclick=()=>window.open('https://wa.me/?text='+encodeURIComponent(report),'_blank','noopener');
  panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
+
+/* Recepciones: nunca se suma al stock operativo, solo queda registro histórico. */
+(()=>{
+ const providerEl=document.getElementById('receiptProvider');if(!providerEl)return;
+ const products=document.getElementById('receiptProducts'),status=document.getElementById('receiptStatus');
+ const providers=[...new Set(stockItems.map(x=>x[2]))];
+ providerEl.innerHTML=providers.map(p=>'<option value="'+p+'">'+p+'</option>').join('');
+ function addRow(){
+  const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;margin:12px 0;flex-wrap:wrap';
+  const sel=document.createElement('select');sel.className='search-input';sel.style.flex='2';
+  const qty=document.createElement('input');qty.type='number';qty.min='0.01';qty.step='0.01';qty.placeholder='Cantidad recibida';qty.className='search-input';qty.style.flex='1';
+  const del=document.createElement('button');del.type='button';del.className='ghost-btn';del.textContent='Quitar';del.onclick=()=>row.remove();
+  row.append(sel,qty,del);products.append(row);fillSelect(sel);
+ }
+ function fillSelect(sel){const options=stockItems.filter(x=>x[2]===providerEl.value);sel.innerHTML=options.map(x=>'<option value="'+x[0]+'">'+x[0]+' ('+x[1]+')</option>').join('');}
+ providerEl.onchange=()=>{products.innerHTML='';addRow()};
+ document.getElementById('receiptAdd').onclick=addRow;
+ async function history(){
+  const el=document.getElementById('receiptHistory');
+  try{const rows=(await window.MontiCloud.listReceipts()).slice(-20).reverse();el.textContent='';
+   if(!rows.length){el.textContent='Todavía no hay ingresos registrados';return}
+   rows.forEach(r=>{const div=document.createElement('div');div.style.cssText='padding:12px 0;border-bottom:1px solid #555';div.textContent=new Date(r.at).toLocaleString('es-AR')+' · '+r.provider+' · '+r.items.map(x=>x.name+': '+x.qty).join(' | ')+(r.notes?' · '+r.notes:'');el.append(div)});
+  }catch(e){el.textContent='No se pudo consultar el historial: '+e.message}
+ }
+ document.getElementById('receiptSave').onclick=async()=>{
+  const btn=document.getElementById('receiptSave'),items=[...products.children].map(row=>({name:row.querySelector('select').value,qty:Number(row.querySelector('input').value)}));
+  if(!items.length||items.some(x=>!Number.isFinite(x.qty)||x.qty<=0)){status.textContent='Completá todas las cantidades con valores mayores a cero.';return}
+  if(new Set(items.map(x=>x.name)).size!==items.length){status.textContent='No repitas un producto en la misma recepción.';return}
+  btn.disabled=true;status.textContent='Guardando en Firebase…';
+  try{await window.MontiCloud.saveReceipt(providerEl.value,items,document.getElementById('receiptNotes').value.trim());status.textContent='Ingreso guardado ✓. No se modificó el stock.';products.innerHTML='';addRow();document.getElementById('receiptNotes').value='';await history()}
+  catch(e){status.textContent='Error: no se guardó el ingreso. '+e.message}finally{btn.disabled=false}
+ };
+ addRow();setTimeout(history,1500);
+})();
