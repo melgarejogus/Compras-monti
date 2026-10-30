@@ -43,9 +43,23 @@ $('viewOrdersBtn').addEventListener('click',()=>navigate('orders'));
 $('quickUpload').addEventListener('click',()=>{if(!currentAdmin)return;navigate('fudo');$('fileInput').click()});
 
 function updateStockTimestamp(){const el=$('stockSavedAt');if(!el)return;const raw=localStorage.getItem('monti.web.stock.v3.savedAt'),date=raw?new Date(raw):null;el.textContent=date&&!Number.isNaN(date.getTime())?'Última carga de stock: '+date.toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'}):'Última carga de stock: sin registro';}
-function renderStock(){updateStockTimestamp();const saved=getStock(),q=norm($('stockSearch')?.value||''),provider=$('stockProvider')?.value||'all';const filtered=stockItems.filter(([name,,p])=>(!q||norm(name).includes(q))&&(provider==='all'||p===provider));$('stockGrid').innerHTML=`<div class="stock-head"><span>Insumo</span><span>Proveedor</span><span>Unidad de carga</span><span>Stock</span></div>`+filtered.map(([name,unit,p])=>{const idx=stockItems.findIndex(x=>x[0]===name);return `<div class="stock-row"><strong>${name}</strong><span class="provider-cell">${p}</span><span class="unit-cell">${unit}</span><input data-stock="${idx}" type="number" step="0.01" inputmode="decimal" value="${saved[name]??''}" placeholder="0"></div>`}).join('')}
+
+const packagingCapacity=Object.fromEntries(stockItems.filter(x=>x[2]==='Packaging').map(([name])=>{const m=name.match(/x\\s*(\\d+)/i);return [name,m?Number(m[1]):null]}));
+function packagingFields(name,value=0){
+ const capacity=packagingCapacity[name];
+ if(!capacity)return '<input data-pack-total type="number" min="0" step="0.01" value="'+value+'">';
+ const boxes=Math.floor((Number(value)||0)/capacity),units=Math.round(((Number(value)||0)-boxes*capacity)*100)/100;
+ return '<div class="pack-fields" data-pack-capacity="'+capacity+'" style="display:flex;gap:6px;flex-wrap:wrap"><label>Cajas <input data-pack-boxes type="number" min="0" step="1" value="'+boxes+'" style="width:75px"></label><label>Unidades <input data-pack-units type="number" min="0" step="1" value="'+units+'" style="width:90px"></label><small>×'+capacity+' por caja</small></div>';
+}
+function packagingQuantity(row){
+ const pack=row.querySelector('[data-pack-capacity]');
+ if(!pack)return Number(row.querySelector('[data-pack-total]')?.value||0);
+ return Number(pack.querySelector('[data-pack-boxes]').value||0)*Number(pack.dataset.packCapacity)+Number(pack.querySelector('[data-pack-units]').value||0);
+}
+
+function renderStock(){updateStockTimestamp();const saved=getStock(),q=norm($('stockSearch')?.value||''),provider=$('stockProvider')?.value||'all';const filtered=stockItems.filter(([name,,p])=>(!q||norm(name).includes(q))&&(provider==='all'||p===provider));$('stockGrid').innerHTML=`<div class="stock-head"><span>Insumo</span><span>Proveedor</span><span>Unidad de carga</span><span>Stock</span></div>`+filtered.map(([name,unit,p])=>{const idx=stockItems.findIndex(x=>x[0]===name);return `<div class="stock-row"><strong>${name}</strong><span class="provider-cell">${p}</span><span class="unit-cell">${unit}</span><span data-stock="${idx}">${provider==='Packaging'||p==='Packaging'?packagingFields(name,saved[name]??0):'<input data-pack-total type="number" step="0.01" inputmode="decimal" value="'+(saved[name]??'')+'" placeholder="0">'}</span></div>`}).join('')}
 $('stockSearch').addEventListener('input',renderStock);$('stockProvider').addEventListener('change',renderStock);
-$('saveStock').addEventListener('click',async()=>{const obj={...getStock()};document.querySelectorAll('[data-stock]').forEach(input=>{const idx=Number(input.dataset.stock);obj[stockItems[idx][0]]=Number(input.value||0)});const saveButton=$('saveStock');const cloudStatus=$('cloudSaveStatus');const setStatus=message=>{saveButton.textContent=message;if(cloudStatus)cloudStatus.textContent=message};saveButton.disabled=true;setStatus('Guardando exclusivamente en Firebase…');try{if(!window.MontiCloud)throw Error('Firebase no está disponible');await window.MontiCloud.saveStock(obj);MontiPlanningCore.saveSnapshotNow();updateStockTimestamp();generateOrders();renderDashboard();setStatus('Guardado y verificado en Firebase ✓');await showStockWhatsAppReport(obj)}catch(err){console.warn('Error al guardar stock en Firebase',err);setStatus('ERROR: no se guardó en Firebase ⚠');alert('No se guardó el stock en Firebase. Los cambios siguen en pantalla; revisá la conexión y reintentá.')}finally{saveButton.disabled=false}});
+$('saveStock').addEventListener('click',async()=>{const obj={...getStock()};document.querySelectorAll('[data-stock]').forEach(row=>{const idx=Number(row.dataset.stock);obj[stockItems[idx][0]]=packagingQuantity(row)});const saveButton=$('saveStock');const cloudStatus=$('cloudSaveStatus');const setStatus=message=>{saveButton.textContent=message;if(cloudStatus)cloudStatus.textContent=message};saveButton.disabled=true;setStatus('Guardando exclusivamente en Firebase…');try{if(!window.MontiCloud)throw Error('Firebase no está disponible');await window.MontiCloud.saveStock(obj);MontiPlanningCore.saveSnapshotNow();updateStockTimestamp();generateOrders();renderDashboard();setStatus('Guardado y verificado en Firebase ✓');await showStockWhatsAppReport(obj)}catch(err){console.warn('Error al guardar stock en Firebase',err);setStatus('ERROR: no se guardó en Firebase ⚠');alert('No se guardó el stock en Firebase. Los cambios siguen en pantalla; revisá la conexión y reintentá.')}finally{saveButton.disabled=false}});
 
 $('fileInput').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;if(!currentAdmin){alert('Solo el administrador puede actualizar Fudo.');return}try{const buf=await file.arrayBuffer();const wb=XLSX.read(buf,{type:'array',cellDates:true});await processWorkbook(wb,file.name,{buffer:buf,size:file.size,type:file.type,lastModified:file.lastModified})}catch(err){console.error(err);alert('Error al cargar ventas: '+String(err?.message||err?.code||err))}});
 
@@ -87,7 +101,7 @@ window.addEventListener('focus',()=>{if(parsedData)generateOrders()});
 
 
 /* Informe de stock: se genera exclusivamente tras confirmación de Firebase. */
-async function showStockWhatsAppReport(stock){
+async async function showStockWhatsAppReport(stock){
  let previous=null,receipts=[];
  try{
   const counts=await window.MontiCloud.listCounts();
@@ -100,12 +114,13 @@ async function showStockWhatsAppReport(stock){
  const now=new Date(),stamp=now.toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'});
  const shift=now.getHours()<17?'Mañana':'Noche';
  const fmt=v=>Number(v).toLocaleString('es-AR',{maximumFractionDigits:2});
+ const display=(name,v)=>packagingCapacity[name]?fmt(v)+' unidades ('+fmt(v/packagingCapacity[name])+' cajas) ':fmt(v);
  const groups=new Map();
  for(const [name,unit,provider] of stockItems){
   if(!groups.has(provider))groups.set(provider,[]);
   const value=Number(stock[name]??0);
   const before=previous?Number(previous.items?.[name]??0):null,entry=received[name]||0;const consumption=before===null?null:before+entry-value;
-  groups.get(provider).push(name+': '+(before===null?'Actual '+fmt(value):'Anterior '+fmt(before)+' | Ingresos +'+fmt(entry)+' | Actual '+fmt(value)+' | Consumo '+fmt(consumption))+' '+unit+(value===0?' ⚠️':''));
+  groups.get(provider).push(name+': '+(before===null?'Actual '+display(name,value):'Anterior '+display(name,before)+' | Ingresos +'+display(name,entry)+' | Actual '+display(name,value)+' | Consumo '+display(name,consumption))+' '+unit+(value===0?' ⚠️':''));
  }
  // Incluir stock porcionado y otros campos persistidos que no figuran en la tabla principal.
  const known=new Set(stockItems.map(x=>x[0]));
@@ -138,7 +153,7 @@ async function showStockWhatsAppReport(stock){
   const sel=document.createElement('select');sel.className='search-input';sel.style.flex='2';
   const qty=document.createElement('input');qty.type='number';qty.min='0.01';qty.step='0.01';qty.placeholder='Cantidad recibida';qty.className='search-input';qty.style.flex='1';
   const del=document.createElement('button');del.type='button';del.className='ghost-btn';del.textContent='Quitar';del.onclick=()=>row.remove();
-  row.append(sel,qty,del);products.append(row);fillSelect(sel);
+  row.append(sel,qty,del);products.append(row);fillSelect(sel);sel.addEventListener('change',()=>fillQty());function fillQty(){const name=sel.value;if(packagingCapacity[name]){qty.replaceWith(document.createElement('span'));const span=row.children[1];span.innerHTML=packagingFields(name,0)}else{const field=row.children[1];field.outerHTML='<input data-pack-total type="number" min="0" step="0.01" placeholder="Cantidad recibida" class="search-input" style="flex:1">'}}fillQty();
  }
  function fillSelect(sel){const options=stockItems.filter(x=>x[2]===providerEl.value);sel.innerHTML=options.map(x=>'<option value="'+x[0]+'">'+x[0]+' ('+x[1]+')</option>').join('');}
  providerEl.onchange=()=>{products.innerHTML='';addRow()};
@@ -151,7 +166,7 @@ async function showStockWhatsAppReport(stock){
   }catch(e){el.textContent='No se pudo consultar el historial: '+e.message}
  }
  document.getElementById('receiptSave').onclick=async()=>{
-  const btn=document.getElementById('receiptSave'),items=[...products.children].map(row=>({name:row.querySelector('select').value,qty:Number(row.querySelector('input').value)}));
+  const btn=document.getElementById('receiptSave'),items=[...products.children].map(row=>({name:row.querySelector('select').value,qty:Number(packagingQuantity(row))}));
   if(!items.length||items.some(x=>!Number.isFinite(x.qty)||x.qty<=0)){status.textContent='Completá todas las cantidades con valores mayores a cero.';return}
   if(new Set(items.map(x=>x.name)).size!==items.length){status.textContent='No repitas un producto en la misma recepción.';return}
   btn.disabled=true;status.textContent='Guardando en Firebase…';
