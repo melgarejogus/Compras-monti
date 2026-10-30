@@ -175,3 +175,39 @@ async async function showStockWhatsAppReport(stock){
  };
  addRow();setTimeout(history,1500);
 })();
+
+/* Simulaciones solo para el administrador: lectura local, sin escrituras a Firebase. */
+(()=>{
+ function panel(id,title,report,anchor){
+  let el=document.getElementById(id);
+  if(!el){el=document.createElement('section');el.id=id;el.className='card';anchor?.insertAdjacentElement('afterend',el)}
+  el.innerHTML='<h3>🧪 SIMULACIÓN · NO GUARDADO</h3><p class="muted">'+title+' · No se modifica el stock ni el historial.</p><textarea readonly rows="15" style="width:100%;white-space:pre-wrap"></textarea><p><button type="button" class="ghost-btn">Copiar simulación</button></p>';
+  el.querySelector('textarea').value=report;
+  el.querySelector('button').onclick=async()=>{try{await navigator.clipboard.writeText(report);el.querySelector('button').textContent='Copiado ✓'}catch{el.querySelector('textarea').select();document.execCommand('copy')}};
+  el.scrollIntoView({behavior:'smooth',block:'start'});
+ }
+ const fmt=x=>Number(x).toLocaleString('es-AR',{maximumFractionDigits:2});
+ const btnStock=document.getElementById('previewStock');
+ if(btnStock)btnStock.onclick=()=>{
+  if(!window.MontiCloud?.isAdmin)return;
+  const previous=getStock(),actual={...previous};
+  document.querySelectorAll('[data-stock]').forEach(row=>{const name=stockItems[Number(row.dataset.stock)]?.[0];if(name)actual[name]=packagingQuantity(row)});
+  const groups=new Map();
+  for(const [name,unit,provider] of stockItems){
+   if(!groups.has(provider))groups.set(provider,[]);
+   const old=Number(previous[name]||0),now=Number(actual[name]||0);
+   groups.get(provider).push(name+' | Anterior '+fmt(old)+' | Ingresos: consultar registros | Actual '+fmt(now)+' | Diferencia '+fmt(old-now)+' '+unit);
+  }
+  const lines=['🧪 MONTI · SIMULACIÓN DE STOCK','NO GUARDADO · NO ENVIAR COMO CONTROL REAL','Fecha: '+new Date().toLocaleString('es-AR')];
+  for(const [provider,items] of groups)lines.push('','📦 '+provider.toUpperCase(),...items);
+  panel('stockPreviewPanel','Vista previa del conteo (sin ingresos históricos)',lines.join('\n'),document.getElementById('stockGrid')?.closest('section'));
+ };
+ const btnReceipt=document.getElementById('previewReceipt');
+ if(btnReceipt)btnReceipt.onclick=()=>{
+  if(!window.MontiCloud?.isAdmin)return;
+  const provider=document.getElementById('receiptProvider').value;
+  const items=[...document.getElementById('receiptProducts').children].map(row=>({name:row.querySelector('select')?.value,qty:packagingQuantity(row)}));
+  const lines=['🧪 MONTI · SIMULACIÓN DE INGRESO','NO GUARDADO · NO MODIFICA STOCK','Fecha: '+new Date().toLocaleString('es-AR'),'Proveedor: '+provider,'',...items.map(x=>x.name+': '+fmt(x.qty)),'','Observaciones: '+(document.getElementById('receiptNotes').value||'Sin observaciones')];
+  panel('receiptPreviewPanel','Vista previa de la recepción',lines.join('\n'),document.getElementById('receiptSave')?.closest('section'));
+ };
+})();
